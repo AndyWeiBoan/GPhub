@@ -598,6 +598,52 @@ async def get_github_rising(
     return GithubRisingResponse(items=results[:top_n], window_hours=window_hours)
 
 
+@router.post("/backfill-star-snapshots")
+async def backfill_star_snapshots(background_tasks: BackgroundTasks):
+    """Backfill star_snapshots from existing github_stars on items.
+
+    Writes one baseline snapshot per GitHub item (recorded 3 days ago),
+    so the next crawl can compute a meaningful delta.
+    Only runs for items that have no snapshot yet.
+    """
+    async def _run():
+        from sqlalchemy import and_
+        baseline_time = datetime.now(timezone.utc) - timedelta(days=3)
+        async with AsyncSessionLocal() as db:
+            rows = await db.execute(
+                select(Item).where(
+                    and_(
+                        Item.category == ContentCategory.github_project,
+                        Item.github_stars.isnot(None),
+                    )
+                )
+            )
+            items = rows.scalars().all()
+
+            # Find items that already have at least one snapshot
+            existing = await db.execute(
+                select(StarSnapshot.item_id).distinct()
+            )
+            already_snapped = {str(r[0]) for r in existing.all()}
+
+            count = 0
+            for item in items:
+                if str(item.id) in already_snapped:
+                    continue
+                db.add(StarSnapshot(
+                    item_id=item.id,
+                    stars=item.github_stars,
+                    recorded_at=baseline_time,
+                ))
+                count += 1
+
+            await db.commit()
+            log.info("star_snapshot_backfill_done", count=count)
+
+    background_tasks.add_task(_run)
+    return {"message": "Star snapshot backfill triggered in background"}
+
+
 @router.post("/trigger-rescore")
 async def trigger_rescore(background_tasks: BackgroundTasks):
     """Re-compute impact/credibility/novelty/total_score for every item in the DB.

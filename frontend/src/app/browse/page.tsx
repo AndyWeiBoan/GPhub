@@ -1,6 +1,6 @@
 import { Suspense } from "react";
-import { fetchItems, fetchSources, fetchGithubRising } from "@/lib/api";
-import type { GithubRisingItem } from "@/lib/api";
+import { fetchItems, fetchSources } from "@/lib/api";
+import type { Item } from "@/lib/api";
 import BrowseList from "@/components/BrowseList";
 import SearchBar from "@/components/SearchBar";
 import { GITHUB_SUBCATS, type GithubSubcat } from "@/lib/githubSubcat";
@@ -43,7 +43,7 @@ export default async function BrowsePage({ searchParams }: PageProps) {
   const sourceName = searchParams.source_name ?? "";
 
   // Pass github_subcat directly to the API — no client-side keyword matching
-  const [sources, data, risingData] = await Promise.all([
+  const [sources, data, trendingGithub] = await Promise.all([
     fetchSources(category || undefined),
     fetchItems({
       page,
@@ -54,9 +54,12 @@ export default async function BrowsePage({ searchParams }: PageProps) {
       q: q || undefined,
       source_name: sourceName || undefined,
     }),
+    // Fetch most recently crawled GitHub items (= latest GitHub Trending snapshot),
+    // then sort by stars to surface the highest-starred ones from that batch.
     category === "github_project"
-      ? fetchGithubRising(8, 48).catch(() => ({ items: [] as GithubRisingItem[], window_hours: 48 }))
-      : Promise.resolve({ items: [] as GithubRisingItem[], window_hours: 48 }),
+      ? fetchItems({ category: "github_project", sort_by: "fetched_at", page_size: 30 })
+          .catch(() => ({ items: [] as Item[], total: 0, page: 1, page_size: 30 }))
+      : Promise.resolve({ items: [] as Item[], total: 0, page: 1, page_size: 30 }),
   ]);
 
   const totalPages = Math.ceil(data.total / PAGE_SIZE);
@@ -178,40 +181,47 @@ export default async function BrowsePage({ searchParams }: PageProps) {
           </div>
         )}
 
-        {/* GitHub Rising — shown below sub-tabs when GitHub is selected */}
-        {category === "github_project" && risingData.items.length > 0 && (
-          <div className="border-t border-white/[0.06] pt-3 pb-2">
-            <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-gray-500">
-              ⭐ Rising This Week
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {risingData.items.map((item) => {
-                const owner = (() => {
-                  try { return new URL(item.url).pathname.split("/")[1]; }
-                  catch { return ""; }
-                })();
-                return (
-                  <a
-                    key={item.id}
-                    href={item.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-2 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-1.5 text-xs transition hover:border-white/15 hover:bg-white/[0.05]"
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={`https://avatars.githubusercontent.com/${owner}?s=32`}
-                      alt=""
-                      className="h-5 w-5 rounded-md object-cover"
-                    />
-                    <span className="font-medium text-gray-200 max-w-[160px] truncate">{item.title}</span>
-                    <span className="font-bold text-yellow-400">+{item.star_delta.toLocaleString()} ★</span>
-                  </a>
-                );
-              })}
+        {/* GitHub Trending — most starred from latest crawl */}
+        {category === "github_project" && trendingGithub.items.length > 0 && (() => {
+          const top = [...trendingGithub.items]
+            .sort((a, b) => (b.github_stars ?? 0) - (a.github_stars ?? 0))
+            .slice(0, 8);
+          return (
+            <div className="border-t border-white/[0.06] pt-3 pb-2">
+              <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-gray-500">
+                ⭐ Trending on GitHub
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {top.map((item) => {
+                  const owner = (() => {
+                    try { return new URL(item.url).pathname.split("/")[1]; }
+                    catch { return ""; }
+                  })();
+                  return (
+                    <a
+                      key={item.id}
+                      href={item.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-1.5 text-xs transition hover:border-white/15 hover:bg-white/[0.05]"
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={`https://avatars.githubusercontent.com/${owner}?s=32`}
+                        alt=""
+                        className="h-5 w-5 rounded-md object-cover"
+                      />
+                      <span className="font-medium text-gray-200 max-w-[160px] truncate">{item.title}</span>
+                      {item.github_stars != null && (
+                        <span className="text-yellow-400">★ {item.github_stars.toLocaleString()}</span>
+                      )}
+                    </a>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
       </div>
 
       {/* ── Scrollable body: list (left) + preview (right) ── */}
