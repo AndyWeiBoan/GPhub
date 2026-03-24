@@ -21,6 +21,7 @@ env/
 # Database
 *.db
 *.sqlite3
+!*.db.gz
 
 # Node dependencies
 node_modules/
