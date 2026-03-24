@@ -147,7 +147,7 @@ async def list_items(
     category: Optional[ContentCategory] = None,
     github_subcat: Optional[GithubSubcat] = None,
     min_score: float = Query(0.0, ge=0.0, le=1.0),
-    sort_by: str = Query("total_score", pattern="^(total_score|published_at|fetched_at)$"),
+    sort_by: str = Query("total_score", pattern="^(total_score|published_at|fetched_at|github_stars)$"),
     q: Optional[str] = Query(None, description="Keyword search on title"),
     source_name: Optional[str] = Query(None, description="Filter by exact source name"),
     db: AsyncSession = Depends(get_db),
@@ -166,6 +166,7 @@ async def list_items(
         "total_score": Item.total_score.desc(),
         "published_at": Item.published_at.desc(),
         "fetched_at": Item.fetched_at.desc(),
+        "github_stars": Item.github_stars.desc(),
     }[sort_by]
     stmt = stmt.order_by(sort_col)
 
@@ -250,6 +251,7 @@ async def get_github_ranking(
 async def get_topics(
     top_k: int = Query(6, ge=1, le=12),
     window_hours: int = Query(168, ge=24, le=720),
+    exclude: Optional[str] = Query(None, description="Comma-separated categories to exclude"),
     db: AsyncSession = Depends(get_db),
 ):
     """Return top trending AI topics with a lead article per topic."""
@@ -257,11 +259,16 @@ async def get_topics(
     from app.scoring.trending import compute_trending_scores
 
     cutoff = datetime.now(timezone.utc) - timedelta(hours=window_hours)
-    rows = await db.execute(
-        select(Item).where(
-            (Item.published_at >= cutoff) | (Item.fetched_at >= cutoff)
-        )
+    stmt = select(Item).where(
+        (Item.published_at >= cutoff) | (Item.fetched_at >= cutoff)
     )
+
+    if exclude:
+        cats = [c.strip() for c in exclude.split(",") if c.strip()]
+        if cats:
+            stmt = stmt.where(Item.category.notin_(cats))
+
+    rows = await db.execute(stmt)
     pool = rows.scalars().all()
 
     if not pool:

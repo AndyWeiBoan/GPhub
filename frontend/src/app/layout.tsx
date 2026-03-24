@@ -13,10 +13,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <nav className="sticky top-0 z-50 border-b border-white/5 bg-[#0f1117]/80 backdrop-blur-md">
           <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3">
             <div className="flex items-center gap-2">
-              <span className="text-lg font-bold tracking-tight text-white">GPhub</span>
-              <span className="rounded-full bg-violet-500/15 px-2 py-0.5 text-xs font-medium text-violet-400">
-                Daily
-              </span>
+              <a href="/" className="flex items-center gap-2 transition hover:opacity-80">
+                <span className="text-2xl font-black tracking-tight text-white">GPhub</span>
+                <span className="rounded-full bg-violet-500/15 px-2 py-0.5 text-xs font-medium text-violet-400">
+                  Daily
+                </span>
+              </a>
             </div>
             <div className="flex items-center gap-6 text-sm text-gray-400">
               <a href="/" className="transition hover:text-white">Feed</a>

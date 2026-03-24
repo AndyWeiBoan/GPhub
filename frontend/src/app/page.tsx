@@ -185,6 +185,45 @@ function MediumCard({ item }: { item: TrendingItem }) {
   );
 }
 
+function TrendingItemSmallCard({ item, rank }: { item: TrendingItem; rank: number }) {
+  const realImg  = hasRealImage(item);
+  const gradient = CAT_GRADIENT[item.category ?? ""] ?? "from-gray-900 to-[#0f1117]";
+  return (
+    <a
+      href={item.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="group relative flex h-full min-h-[140px] overflow-hidden rounded-xl border border-white/[0.06] bg-[#161b27] transition hover:border-white/15"
+    >
+      {realImg ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={item.thumbnail_url!}
+          alt=""
+          className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
+        />
+      ) : (
+        <span className={`absolute inset-0 bg-gradient-to-br ${gradient}`} />
+      )}
+      <span className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
+      <span className="relative mt-auto w-full p-3">
+        <span className="mb-1.5 flex items-center gap-1.5">
+          <span className="text-[10px] font-bold text-orange-400">#{rank}</span>
+          <CategoryPill category={item.category} />
+          <span className="ml-auto text-[9px] text-gray-500">{timeAgo(item.published_at ?? item.fetched_at)}</span>
+        </span>
+        <h3 className="text-sm font-bold leading-snug text-white group-hover:text-gray-100 line-clamp-2">
+          {item.title}
+        </h3>
+        {item.source_name && (
+          <p className="mt-1 text-[10px] text-gray-500">{item.source_name}</p>
+        )}
+      </span>
+      <PhotoCredit attribution={item.thumbnail_attribution} />
+    </a>
+  );
+}
+
 // ── Sidebar row (text only) ───────────────────────────────────────────────────
 
 function SidebarRow({ item, rank }: { item: TrendingItem; rank: number }) {
@@ -431,15 +470,17 @@ const LATEST_CATEGORIES: { key: string; label: string }[] = [
 ];
 
 export default async function HomePage() {
-  const topicsData = await fetchTopics(6, 168);
-  const topics = topicsData.topics;
+  const topicsData = await fetchTopics(12, 168);
+  const topics = topicsData.topics.filter(
+    (t) => t.lead_item.category !== "github_project"
+  ).slice(0, 6);
 
   // Collect IDs already shown in Hot Topics section
   const hotTopicIds = topics.map((t) => t.lead_item.id).join(",");
 
   // Fetch row-3 MediumCards, per-category, and GitHub rising
   const [allData, risingData, ...categoryResults] = await Promise.all([
-    fetchTrending(3, 168),
+    fetchTrending(5, 168),
     fetchGithubRising(8, 48).catch(() => ({ items: [], window_hours: 48 })),
     ...LATEST_CATEGORIES.map(({ key }) =>
       fetchTrending(20, 168, { include: key, exclude: hotTopicIds || undefined })
@@ -447,6 +488,7 @@ export default async function HomePage() {
   ]);
 
   const gridItems = allData.items.slice(0, 3);
+  const fallbackItems = allData.items.slice(3, 5);
 
   // Build full exclusion list: Hot Topics lead items + row-3 MediumCards
   const excludedIds = new Set([
@@ -561,12 +603,20 @@ export default async function HomePage() {
 
               {/* #5 — 右下，3 欄 */}
               <div className="col-span-3">
-                {topics[4] && <TopicSmallCard topic={topics[4]} rank={5} />}
+                {topics[4] ? (
+                  <TopicSmallCard topic={topics[4]} rank={5} />
+                ) : fallbackItems[0] ? (
+                  <TrendingItemSmallCard item={fallbackItems[0]} rank={5} />
+                ) : null}
               </div>
 
               {/* #6 — 右下，3 欄 */}
               <div className="col-span-3">
-                {topics[5] && <TopicSmallCard topic={topics[5]} rank={6} />}
+                {topics[5] ? (
+                  <TopicSmallCard topic={topics[5]} rank={6} />
+                ) : fallbackItems[1] ? (
+                  <TrendingItemSmallCard item={fallbackItems[1]} rank={6} />
+                ) : null}
               </div>
 
             </div>

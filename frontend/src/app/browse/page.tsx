@@ -163,14 +163,14 @@ export default async function BrowsePage({ searchParams }: PageProps) {
 
         {/* GitHub sub-tabs — shown only when GitHub category is selected */}
         {category === "github_project" && (
-          <div className="flex gap-2 pb-3">
+          <div className="flex items-center gap-2 pb-3">
             {GITHUB_SUBCATS.map((sub) => (
               <a
                 key={sub.value}
-                href={buildHref({ github_sub: sub.value, page: 1 })}
+                href={buildHref({ github_sub: sub.value, page: 1, sort_by: sort_by === "github_stars" ? "total_score" : sort_by })}
                 title={sub.desc}
                 className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
-                  githubSub === sub.value
+                  githubSub === sub.value && sort_by !== "github_stars"
                     ? "border-emerald-500 bg-emerald-500/20 text-emerald-300"
                     : "border-white/10 bg-white/[0.03] text-gray-400 hover:border-white/20 hover:text-white"
                 }`}
@@ -178,50 +178,19 @@ export default async function BrowsePage({ searchParams }: PageProps) {
                 {sub.label}
               </a>
             ))}
+            {/* Trending tab */}
+            <a
+              href={buildHref({ sort_by: "github_stars", page: 1, github_sub: "" })}
+              className={`ml-2 rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
+                sort_by === "github_stars"
+                  ? "border-yellow-500 bg-yellow-500/20 text-yellow-300"
+                  : "border-white/10 bg-white/[0.03] text-gray-400 hover:border-white/20 hover:text-white"
+              }`}
+            >
+              ⭐ Trending
+            </a>
           </div>
         )}
-
-        {/* GitHub Trending — most starred from latest crawl */}
-        {category === "github_project" && trendingGithub.items.length > 0 && (() => {
-          const top = [...trendingGithub.items]
-            .sort((a, b) => (b.github_stars ?? 0) - (a.github_stars ?? 0))
-            .slice(0, 8);
-          return (
-            <div className="border-t border-white/[0.06] pt-3 pb-2">
-              <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-gray-500">
-                ⭐ Trending on GitHub
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {top.map((item) => {
-                  const owner = (() => {
-                    try { return new URL(item.url).pathname.split("/")[1]; }
-                    catch { return ""; }
-                  })();
-                  return (
-                    <a
-                      key={item.id}
-                      href={item.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-2 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-1.5 text-xs transition hover:border-white/15 hover:bg-white/[0.05]"
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={`https://avatars.githubusercontent.com/${owner}?s=32`}
-                        alt=""
-                        className="h-5 w-5 rounded-md object-cover"
-                      />
-                      <span className="font-medium text-gray-200 max-w-[160px] truncate">{item.title}</span>
-                      {item.github_stars != null && (
-                        <span className="text-yellow-400">★ {item.github_stars.toLocaleString()}</span>
-                      )}
-                    </a>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })()}
       </div>
 
       {/* ── Scrollable body: list (left) + preview (right) ── */}
