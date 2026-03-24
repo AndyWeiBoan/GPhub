@@ -45,6 +45,13 @@ start() {
     kill_port $FRONTEND_PORT
     sleep 0.5
 
+    # Restore database from compressed backup if not exists
+    if [ -f "$BACKEND_DIR/ai_digest.db.gz" ] && [ ! -f "$BACKEND_DIR/ai_digest.db" ]; then
+        echo "  Restoring database from backup..."
+        gunzip -k "$BACKEND_DIR/ai_digest.db.gz"
+        echo "  ✓ Database restored"
+    fi
+
     # Start backend
     cd "$BACKEND_DIR" || exit 1
     if [ -d ".venv" ]; then
