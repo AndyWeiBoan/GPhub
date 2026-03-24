@@ -1,17 +1,15 @@
 "use client";
 import { useState, useCallback } from "react";
 import type { Item } from "@/lib/api";
-import type { ReactNode } from "react";
 import ItemRow from "./ItemRow";
 import PreviewPanel from "./PreviewPanel";
 
 interface Props {
   items: Item[];
   pageOffset: number;
-  pagination?: ReactNode;
 }
 
-export default function BrowseList({ items, pageOffset, pagination }: Props) {
+export default function BrowseList({ items, pageOffset }: Props) {
   const [previewItem, setPreviewItem] = useState<Item | null>(null);
   const isPanelOpen = previewItem !== null;
 
@@ -46,8 +44,7 @@ export default function BrowseList({ items, pageOffset, pagination }: Props) {
               ))}
             </div>
           )}
-          {/* Pagination lives inside the scroll area */}
-          {pagination}
+
         </div>
       </div>
 

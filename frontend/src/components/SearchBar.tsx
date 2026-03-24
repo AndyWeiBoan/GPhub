@@ -1,6 +1,6 @@
 "use client";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 
 interface Props {
   sources: string[];
@@ -24,19 +24,19 @@ export default function SearchBar({ sources, initialQ, initialSource, basePath }
     return `${basePath}?${p.toString()}`;
   }
 
-  // Debounce search input (400ms)
-  useEffect(() => {
+  // Debounce search input (400ms) — only triggered by user typing, not by remount
+  function handleQ(val: string) {
+    setQ(val);
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
-      router.push(buildUrl(q, source));
+      router.push(buildUrl(val, source));
     }, 400);
-    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q]);
+  }
 
   // Source dropdown: navigate immediately
   function handleSource(val: string) {
     setSource(val);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
     router.push(buildUrl(q, val));
   }
 
@@ -50,13 +50,13 @@ export default function SearchBar({ sources, initialQ, initialSource, basePath }
         <input
           type="text"
           value={q}
-          onChange={(e) => setQ(e.target.value)}
+          onChange={(e) => handleQ(e.target.value)}
           placeholder="Search titles…"
           className="w-full rounded-lg border border-white/10 bg-white/[0.03] py-1.5 pl-8 pr-3 text-sm text-gray-200 placeholder-gray-600 outline-none transition focus:border-violet-500/50 focus:bg-white/[0.05]"
         />
         {q && (
           <button
-            onClick={() => setQ("")}
+            onClick={() => handleQ("")}
             className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-600 hover:text-gray-300"
           >
             ✕

@@ -71,28 +71,6 @@ export default async function BrowsePage({ searchParams }: PageProps) {
     return `/browse?${new URLSearchParams(merged).toString()}`;
   }
 
-  const pagination = totalPages > 1 ? (
-    <div className="flex items-center justify-center gap-3 py-6">
-      {page > 1 && (
-        <a
-          href={buildHref({ page: page - 1 })}
-          className="rounded-lg border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-gray-300 transition hover:border-white/20 hover:text-white"
-        >
-          ← Previous
-        </a>
-      )}
-      <span className="text-sm text-gray-600">Page {page} of {totalPages}</span>
-      {page < totalPages && (
-        <a
-          href={buildHref({ page: page + 1 })}
-          className="rounded-lg border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-gray-300 transition hover:border-white/20 hover:text-white"
-        >
-          Next →
-        </a>
-      )}
-    </div>
-  ) : null;
-
   return (
     <div className="mx-auto max-w-6xl flex flex-col px-4" style={{ height: "calc(100vh - 49px)" }}>
 
@@ -147,6 +125,29 @@ export default async function BrowsePage({ searchParams }: PageProps) {
           />
         </Suspense>
 
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-center gap-3">
+            {page > 1 && (
+              <a
+                href={buildHref({ page: page - 1 })}
+                className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-1.5 text-sm text-gray-300 transition hover:border-white/20 hover:text-white"
+              >
+                ← Prev
+              </a>
+            )}
+            <span className="text-sm text-gray-500">{page} / {totalPages}</span>
+            {page < totalPages && (
+              <a
+                href={buildHref({ page: page + 1 })}
+                className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-1.5 text-sm text-gray-300 transition hover:border-white/20 hover:text-white"
+              >
+                Next →
+              </a>
+            )}
+          </div>
+        )}
+
         {/* GitHub sub-tabs — shown only when GitHub category is selected */}
         {category === "github_project" && (
           <div className="flex gap-2 border-b border-white/[0.06] pb-3">
@@ -173,7 +174,6 @@ export default async function BrowsePage({ searchParams }: PageProps) {
         <BrowseList
           items={data.items}
           pageOffset={(page - 1) * PAGE_SIZE}
-          pagination={pagination}
         />
       </div>
     </div>
