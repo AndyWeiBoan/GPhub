@@ -1,5 +1,6 @@
 import { Suspense } from "react";
-import { fetchItems, fetchSources } from "@/lib/api";
+import { fetchItems, fetchSources, fetchGithubRising } from "@/lib/api";
+import type { GithubRisingItem } from "@/lib/api";
 import BrowseList from "@/components/BrowseList";
 import SearchBar from "@/components/SearchBar";
 import { GITHUB_SUBCATS, type GithubSubcat } from "@/lib/githubSubcat";
@@ -42,7 +43,7 @@ export default async function BrowsePage({ searchParams }: PageProps) {
   const sourceName = searchParams.source_name ?? "";
 
   // Pass github_subcat directly to the API — no client-side keyword matching
-  const [sources, data] = await Promise.all([
+  const [sources, data, risingData] = await Promise.all([
     fetchSources(category || undefined),
     fetchItems({
       page,
@@ -53,6 +54,9 @@ export default async function BrowsePage({ searchParams }: PageProps) {
       q: q || undefined,
       source_name: sourceName || undefined,
     }),
+    category === "github_project"
+      ? fetchGithubRising(8, 48).catch(() => ({ items: [] as GithubRisingItem[], window_hours: 48 }))
+      : Promise.resolve({ items: [] as GithubRisingItem[], window_hours: 48 }),
   ]);
 
   const totalPages = Math.ceil(data.total / PAGE_SIZE);
@@ -156,7 +160,7 @@ export default async function BrowsePage({ searchParams }: PageProps) {
 
         {/* GitHub sub-tabs — shown only when GitHub category is selected */}
         {category === "github_project" && (
-          <div className="flex gap-2 border-b border-white/[0.06] pb-3">
+          <div className="flex gap-2 pb-3">
             {GITHUB_SUBCATS.map((sub) => (
               <a
                 key={sub.value}
@@ -171,6 +175,41 @@ export default async function BrowsePage({ searchParams }: PageProps) {
                 {sub.label}
               </a>
             ))}
+          </div>
+        )}
+
+        {/* GitHub Rising — shown below sub-tabs when GitHub is selected */}
+        {category === "github_project" && risingData.items.length > 0 && (
+          <div className="border-t border-white/[0.06] pt-3 pb-2">
+            <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-gray-500">
+              ⭐ Rising This Week
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {risingData.items.map((item) => {
+                const owner = (() => {
+                  try { return new URL(item.url).pathname.split("/")[1]; }
+                  catch { return ""; }
+                })();
+                return (
+                  <a
+                    key={item.id}
+                    href={item.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-1.5 text-xs transition hover:border-white/15 hover:bg-white/[0.05]"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={`https://avatars.githubusercontent.com/${owner}?s=32`}
+                      alt=""
+                      className="h-5 w-5 rounded-md object-cover"
+                    />
+                    <span className="font-medium text-gray-200 max-w-[160px] truncate">{item.title}</span>
+                    <span className="font-bold text-yellow-400">+{item.star_delta.toLocaleString()} ★</span>
+                  </a>
+                );
+              })}
+            </div>
           </div>
         )}
       </div>
