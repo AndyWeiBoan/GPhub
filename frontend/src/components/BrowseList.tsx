@@ -1,5 +1,5 @@
 "use client";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import type { Item } from "@/lib/api";
 import ItemRow from "./ItemRow";
 import PreviewPanel from "./PreviewPanel";
@@ -29,6 +29,14 @@ export default function BrowseList({ items, pageOffset }: Props) {
     setPreviewIndex((prev) => (prev !== null && prev < items.length - 1 ? prev + 1 : prev));
   }, [items.length]);
 
+  // Scroll active row into view when navigating with arrows
+  const rowRefs = useRef<(HTMLDivElement | null)[]>([]);
+  useEffect(() => {
+    if (previewIndex !== null) {
+      rowRefs.current[previewIndex]?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }
+  }, [previewIndex]);
+
   return (
     <div className="flex h-full gap-3">
 
@@ -44,13 +52,14 @@ export default function BrowseList({ items, pageOffset }: Props) {
           ) : (
             <div className="divide-y divide-white/[0.04]">
               {items.map((item, i) => (
-                <ItemRow
-                  key={item.id}
-                  item={item}
-                  rank={pageOffset + i + 1}
-                  onPreview={handlePreview}
-                  isPreviewing={previewIndex === i}
-                />
+                <div key={item.id} ref={(el) => { rowRefs.current[i] = el; }}>
+                  <ItemRow
+                    item={item}
+                    rank={pageOffset + i + 1}
+                    onPreview={handlePreview}
+                    isPreviewing={previewIndex === i}
+                  />
+                </div>
               ))}
             </div>
           )}
