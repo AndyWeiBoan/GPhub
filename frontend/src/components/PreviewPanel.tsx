@@ -108,43 +108,41 @@ export default function PreviewPanel({ item, onClose, onPrev, onNext, hasPrev, h
       {/* ── Top bar: close ── */}
       <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-white/[0.06]">
         <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Preview</span>
-        <button
-          onClick={onClose}
-          aria-label="Close preview"
-          className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-500 transition hover:bg-white/[0.08] hover:text-white"
-        >
-          <svg viewBox="0 0 16 16" fill="currentColor" className="h-4 w-4">
-            <path d="M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.75.75 0 1 1 1.06 1.06L9.06 8l3.22 3.22a.75.75 0 1 1-1.06 1.06L8 9.06l-3.22 3.22a.75.75 0 0 1-1.06-1.06L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06z" />
-          </svg>
-        </button>
-      </div>
-
-      {/* ── Prev / Next navigation ── */}
-      <div className="flex items-center gap-2 px-4 py-2 border-b border-white/[0.06]">
-        <button
-          onClick={onPrev}
-          disabled={!hasPrev}
-          aria-label="Previous item"
-          className={`flex h-7 w-7 items-center justify-center rounded-lg text-sm transition ${
-            hasPrev
-              ? "text-gray-400 hover:bg-white/[0.08] hover:text-white"
-              : "text-gray-700 cursor-not-allowed"
-          }`}
-        >
-          ←
-        </button>
-        <button
-          onClick={onNext}
-          disabled={!hasNext}
-          aria-label="Next item"
-          className={`flex h-7 w-7 items-center justify-center rounded-lg text-sm transition ${
-            hasNext
-              ? "text-gray-400 hover:bg-white/[0.08] hover:text-white"
-              : "text-gray-700 cursor-not-allowed"
-          }`}
-        >
-          →
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={onPrev}
+            disabled={!hasPrev}
+            aria-label="Previous item"
+            className={`flex h-7 w-7 items-center justify-center rounded-lg text-sm transition ${
+              hasPrev
+                ? "text-gray-400 hover:bg-white/[0.08] hover:text-white"
+                : "text-gray-700 cursor-not-allowed"
+            }`}
+          >
+            ←
+          </button>
+          <button
+            onClick={onNext}
+            disabled={!hasNext}
+            aria-label="Next item"
+            className={`flex h-7 w-7 items-center justify-center rounded-lg text-sm transition ${
+              hasNext
+                ? "text-gray-400 hover:bg-white/[0.08] hover:text-white"
+                : "text-gray-700 cursor-not-allowed"
+            }`}
+          >
+            →
+          </button>
+          <button
+            onClick={onClose}
+            aria-label="Close preview"
+            className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-500 transition hover:bg-white/[0.08] hover:text-white"
+          >
+            <svg viewBox="0 0 16 16" fill="currentColor" className="h-4 w-4">
+              <path d="M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.75.75 0 1 1 1.06 1.06L9.06 8l3.22 3.22a.75.75 0 1 1-1.06 1.06L8 9.06l-3.22 3.22a.75.75 0 0 1-1.06-1.06L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06z" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       {/* ── Action + Scores (pinned below header) ── */}
