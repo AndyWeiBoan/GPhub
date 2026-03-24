@@ -115,38 +115,44 @@ export default async function BrowsePage({ searchParams }: PageProps) {
           </div>
         </div>
 
-        {/* Search + Source */}
-        <Suspense>
-          <SearchBar
-            sources={sources}
-            initialQ={q}
-            initialSource={sourceName}
-            basePath="/browse"
-          />
-        </Suspense>
+        {/* Search + Source + Pagination */}
+        <div className="flex items-center gap-2 mt-2">
+          <Suspense>
+            <SearchBar
+              sources={sources}
+              initialQ={q}
+              initialSource={sourceName}
+              basePath="/browse"
+            />
+          </Suspense>
 
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-center gap-3">
-            {page > 1 && (
+          {totalPages > 1 && (
+            <div className="flex items-center gap-1 flex-shrink-0">
               <a
-                href={buildHref({ page: page - 1 })}
-                className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-1.5 text-sm text-gray-300 transition hover:border-white/20 hover:text-white"
+                href={page > 1 ? buildHref({ page: page - 1 }) : "#"}
+                aria-disabled={page <= 1}
+                className={`rounded-lg border px-3 py-1.5 text-sm transition ${
+                  page > 1
+                    ? "border-white/10 bg-white/[0.03] text-gray-300 hover:border-white/20 hover:text-white"
+                    : "border-transparent bg-transparent text-transparent pointer-events-none"
+                }`}
               >
-                ← Prev
+                ←
               </a>
-            )}
-            <span className="text-sm text-gray-500">{page} / {totalPages}</span>
-            {page < totalPages && (
-              <a
-                href={buildHref({ page: page + 1 })}
-                className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-1.5 text-sm text-gray-300 transition hover:border-white/20 hover:text-white"
-              >
-                Next →
-              </a>
-            )}
-          </div>
-        )}
+              <span className="px-2 text-sm text-gray-500 whitespace-nowrap">{page} / {totalPages}</span>
+              {page < totalPages ? (
+                <a
+                  href={buildHref({ page: page + 1 })}
+                  className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-1.5 text-sm text-gray-300 transition hover:border-white/20 hover:text-white"
+                >
+                  →
+                </a>
+              ) : (
+                <span className="rounded-lg border border-transparent px-3 py-1.5 text-sm">→</span>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* GitHub sub-tabs — shown only when GitHub category is selected */}
         {category === "github_project" && (
