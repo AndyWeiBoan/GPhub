@@ -100,6 +100,20 @@ class Item(Base):
     updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class StarSnapshot(Base):
+    """One row per (item, crawl) — records github_stars at a point in time."""
+    __tablename__ = "star_snapshots"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    item_id = Column(
+        String(36) if _is_sqlite else PG_UUID(as_uuid=True),
+        ForeignKey("items.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    stars = Column(Integer, nullable=False)
+    recorded_at = Column(DateTime(timezone=True), default=datetime.utcnow, nullable=False)
+
+
 class CrawlRun(Base):
     __tablename__ = "crawl_runs"
 

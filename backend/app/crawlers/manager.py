@@ -10,7 +10,7 @@ from app.crawlers.github_crawler import GitHubCrawler
 from app.crawlers.anthropic_crawler import AnthropicCrawler
 # TwitterCrawler kept for future use (requires Twitter account credentials)
 # from app.crawlers.twitter_crawler import TwitterCrawler
-from app.models import Item, Source, CrawlRun, ContentCategory
+from app.models import Item, Source, CrawlRun, ContentCategory, StarSnapshot
 from app.scoring.engine import score_item
 
 log = structlog.get_logger()
@@ -41,8 +41,16 @@ async def run_crawl(db: AsyncSession) -> dict:
     items_new = 0
     for raw in all_items:
         # Check duplicate
-        existing = await db.execute(select(Item).where(Item.url == raw.url))
-        if existing.scalar_one_or_none():
+        existing_row = await db.execute(select(Item).where(Item.url == raw.url))
+        existing_item = existing_row.scalar_one_or_none()
+
+        # For GitHub repos: update star count and record a snapshot
+        if existing_item and raw.github_stars is not None:
+            existing_item.github_stars = raw.github_stars
+            db.add(StarSnapshot(item_id=existing_item.id, stars=raw.github_stars))
+            continue
+
+        if existing_item:
             continue
 
         # Get or create source
@@ -83,6 +91,12 @@ async def run_crawl(db: AsyncSession) -> dict:
         item.total_score = scores["total"]
 
         db.add(item)
+
+        # Record initial star snapshot for GitHub repos
+        if raw.github_stars is not None:
+            await db.flush()  # ensure item.id is populated
+            db.add(StarSnapshot(item_id=item.id, stars=raw.github_stars))
+
         items_new += 1
 
     run.finished_at = datetime.now(timezone.utc)

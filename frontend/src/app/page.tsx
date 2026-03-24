@@ -1,5 +1,5 @@
-import { fetchTrending, fetchTopics } from "@/lib/api";
-import type { TrendingItem, Topic, TopicLeadItem } from "@/lib/api";
+import { fetchTrending, fetchTopics, fetchGithubRising } from "@/lib/api";
+import type { TrendingItem, Topic, TopicLeadItem, GithubRisingItem } from "@/lib/api";
 import CategoryPill from "@/components/CategoryPill";
 import Thumb from "@/components/Thumb";
 import PhotoCredit from "@/components/PhotoCredit";
@@ -209,6 +209,47 @@ function SidebarRow({ item, rank }: { item: TrendingItem; rank: number }) {
   );
 }
 
+// ── GitHub Rising row ─────────────────────────────────────────────────────────
+
+function GithubRisingRow({ item, rank }: { item: GithubRisingItem; rank: number }) {
+  const owner = (() => {
+    try { return new URL(item.url).pathname.split("/")[1]; }
+    catch { return ""; }
+  })();
+  return (
+    <a
+      href={item.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="group flex items-center gap-3 rounded-xl border border-white/[0.05] bg-white/[0.02] px-3 py-2.5 transition hover:border-white/10 hover:bg-white/[0.04]"
+    >
+      <span className="w-5 flex-shrink-0 text-right text-xs font-black text-gray-700">{rank}</span>
+      {/* Avatar */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={`https://avatars.githubusercontent.com/${owner}?s=40`}
+        alt=""
+        className="h-7 w-7 flex-shrink-0 rounded-lg object-cover"
+      />
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-semibold text-gray-100 group-hover:text-white line-clamp-1">
+          {item.title}
+        </span>
+        {item.summary && (
+          <span className="block text-[11px] text-gray-500 line-clamp-1 mt-0.5">{item.summary}</span>
+        )}
+      </span>
+      {/* Star delta badge */}
+      <span className="flex-shrink-0 flex items-center gap-1 rounded-full bg-yellow-500/10 px-2 py-0.5 text-[11px] font-bold text-yellow-400">
+        ★ +{item.star_delta.toLocaleString()}
+      </span>
+      <span className="flex-shrink-0 text-[10px] text-gray-600">
+        {item.github_stars?.toLocaleString()} total
+      </span>
+    </a>
+  );
+}
+
 // ── Topic helpers ─────────────────────────────────────────────────────────────
 
 function topicDesc(lead: TopicLeadItem, maxLen = 160): string {
@@ -396,9 +437,10 @@ export default async function HomePage() {
   // Collect IDs already shown in Hot Topics section
   const hotTopicIds = topics.map((t) => t.lead_item.id).join(",");
 
-  // Fetch row-3 MediumCards and per-category (fetch more to survive dedup)
-  const [allData, ...categoryResults] = await Promise.all([
+  // Fetch row-3 MediumCards, per-category, and GitHub rising
+  const [allData, risingData, ...categoryResults] = await Promise.all([
     fetchTrending(3, 168),
+    fetchGithubRising(8, 48).catch(() => ({ items: [], window_hours: 48 })),
     ...LATEST_CATEGORIES.map(({ key }) =>
       fetchTrending(20, 168, { include: key, exclude: hotTopicIds || undefined })
     ),
@@ -534,7 +576,9 @@ export default async function HomePage() {
           <div className="space-y-8">
             {LATEST_CATEGORIES.map(({ key, label }, i) => {
               const items = dedupeItems(categoryResults[i]?.items ?? [], 4);
-              if (items.length === 0) return null;
+              const isGithub = key === "github_project";
+              const risingItems = risingData.items;
+              if (items.length === 0 && !(isGithub && risingItems.length > 0)) return null;
               return (
                 <section key={key}>
                   <div className="mb-4 flex items-center justify-between">
@@ -545,9 +589,25 @@ export default async function HomePage() {
                       See all →
                     </a>
                   </div>
-                  <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-                    {items.map((item) => <MediumCard key={item.id} item={item} />)}
-                  </div>
+                  {items.length > 0 && (
+                    <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                      {items.map((item) => <MediumCard key={item.id} item={item} />)}
+                    </div>
+                  )}
+
+                  {/* GitHub Rising — shown below the GitHub latest row */}
+                  {isGithub && risingItems.length > 0 && (
+                    <div className="mt-5">
+                      <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-gray-500">
+                        ⭐ Rising This Week
+                      </p>
+                      <div className="flex flex-col gap-1.5">
+                        {risingItems.map((item, idx) => (
+                          <GithubRisingRow key={item.id} item={item} rank={idx + 1} />
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </section>
               );
             })}

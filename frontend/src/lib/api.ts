@@ -153,6 +153,37 @@ export async function fetchTrending(
   return res.json();
 }
 
+export interface GithubRisingItem {
+  id: string;
+  title: string;
+  url: string;
+  summary: string | null;
+  thumbnail_url: string | null;
+  source_name: string | null;
+  github_subcat: GithubSubcat | null;
+  github_stars: number | null;
+  star_delta: number;
+  star_delta_pct: number;
+  total_score: number;
+}
+
+export interface GithubRisingResponse {
+  items: GithubRisingItem[];
+  window_hours: number;
+}
+
+export async function fetchGithubRising(
+  top_n = 10,
+  window_hours = 48
+): Promise<GithubRisingResponse> {
+  const url = new URL(`${API_BASE}/api/v1/github-rising`);
+  url.searchParams.set("top_n", String(top_n));
+  url.searchParams.set("window_hours", String(window_hours));
+  const res = await fetch(url.toString(), { cache: "no-store" });
+  if (!res.ok) throw new Error("Failed to fetch github rising");
+  return res.json();
+}
+
 export async function fetchStats(): Promise<Stats> {
   const res = await fetch(`${API_BASE}/api/v1/stats`, { cache: "no-store" });
   if (!res.ok) throw new Error("Failed to fetch stats");

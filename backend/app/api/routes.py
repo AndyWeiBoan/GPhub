@@ -9,7 +9,7 @@ from pydantic import BaseModel, ConfigDict
 from datetime import datetime, timezone, timedelta
 
 from app.database import get_db, AsyncSessionLocal
-from app.models import Item, Source, CrawlRun, ContentCategory, GithubSubcat
+from app.models import Item, Source, CrawlRun, ContentCategory, GithubSubcat, StarSnapshot
 from app.crawlers.manager import run_crawl
 from app.summarizer.claude import summarise_pending
 from app.scoring.trending import compute_trending_scores
@@ -484,6 +484,118 @@ async def trigger_pexels(background_tasks: BackgroundTasks):
 
     background_tasks.add_task(_run)
     return {"message": "Pexels enrichment triggered"}
+
+
+class GithubRisingItem(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    title: str
+    url: str
+    summary: Optional[str]
+    thumbnail_url: Optional[str]
+    source_name: Optional[str]
+    github_subcat: Optional[GithubSubcat]
+    github_stars: Optional[int]
+    star_delta: int          # stars gained in the window
+    star_delta_pct: float    # percentage growth
+    total_score: float
+
+
+class GithubRisingResponse(BaseModel):
+    items: list[GithubRisingItem]
+    window_hours: int
+
+
+@router.get("/github-rising", response_model=GithubRisingResponse)
+async def get_github_rising(
+    top_n: int = Query(10, ge=1, le=30),
+    window_hours: int = Query(48, ge=6, le=336),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return GitHub repos ranked by star growth (delta) over the past window_hours."""
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=window_hours)
+
+    # For each item, get the latest snapshot and the oldest snapshot within the window
+    from sqlalchemy import and_
+
+    # Fetch all GitHub items that have snapshots
+    rows = await db.execute(
+        select(Item).where(Item.category == ContentCategory.github_project)
+    )
+    github_items = {str(item.id): item for item in rows.scalars().all()}
+
+    if not github_items:
+        return GithubRisingResponse(items=[], window_hours=window_hours)
+
+    # Fetch all snapshots within window for these items
+    snap_rows = await db.execute(
+        select(StarSnapshot).where(
+            and_(
+                StarSnapshot.item_id.in_(list(github_items.keys())),
+                StarSnapshot.recorded_at >= cutoff,
+            )
+        ).order_by(StarSnapshot.item_id, StarSnapshot.recorded_at.asc())
+    )
+    snapshots = snap_rows.scalars().all()
+
+    # Also fetch the most recent snapshot before the window (baseline)
+    baseline_rows = await db.execute(
+        select(StarSnapshot).where(
+            and_(
+                StarSnapshot.item_id.in_(list(github_items.keys())),
+                StarSnapshot.recorded_at < cutoff,
+            )
+        ).order_by(StarSnapshot.item_id, StarSnapshot.recorded_at.desc())
+    )
+    baselines_raw = baseline_rows.scalars().all()
+
+    # Keep only the latest baseline per item
+    baselines: dict[str, int] = {}
+    for snap in baselines_raw:
+        iid = str(snap.item_id)
+        if iid not in baselines:
+            baselines[iid] = snap.stars
+
+    # Group window snapshots by item
+    from collections import defaultdict
+    window_snaps: dict[str, list] = defaultdict(list)
+    for snap in snapshots:
+        window_snaps[str(snap.item_id)].append(snap)
+
+    results = []
+    for item_id, snaps in window_snaps.items():
+        item = github_items.get(item_id)
+        if not item:
+            continue
+
+        latest_stars = snaps[-1].stars
+        # Baseline: oldest snapshot before the window, or first snapshot in window
+        baseline_stars = baselines.get(item_id, snaps[0].stars)
+
+        delta = latest_stars - baseline_stars
+        if delta <= 0:
+            continue
+
+        delta_pct = round((delta / baseline_stars * 100) if baseline_stars > 0 else 0.0, 1)
+
+        results.append(GithubRisingItem(
+            id=str(item.id),
+            title=item.title,
+            url=item.url,
+            summary=item.summary,
+            thumbnail_url=item.thumbnail_url,
+            source_name=item.source_name,
+            github_subcat=item.github_subcat,
+            github_stars=latest_stars,
+            star_delta=delta,
+            star_delta_pct=delta_pct,
+            total_score=float(item.total_score or 0),
+        ))
+
+    # Sort by absolute delta desc
+    results.sort(key=lambda x: x.star_delta, reverse=True)
+
+    return GithubRisingResponse(items=results[:top_n], window_hours=window_hours)
 
 
 @router.post("/trigger-rescore")
