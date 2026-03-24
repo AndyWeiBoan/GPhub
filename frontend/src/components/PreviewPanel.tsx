@@ -51,9 +51,13 @@ const SCORE_COLOR: Record<string, string> = {
 interface Props {
   item: Item | null;
   onClose: () => void;
+  onPrev: () => void;
+  onNext: () => void;
+  hasPrev: boolean;
+  hasNext: boolean;
 }
 
-export default function PreviewPanel({ item, onClose }: Props) {
+export default function PreviewPanel({ item, onClose, onPrev, onNext, hasPrev, hasNext }: Props) {
   const [imgFailed, setImgFailed] = useState(false);
   const [visible, setVisible] = useState(false);
   const [rawExpanded, setRawExpanded] = useState(false);
@@ -115,6 +119,34 @@ export default function PreviewPanel({ item, onClose }: Props) {
         </button>
       </div>
 
+      {/* ── Prev / Next navigation ── */}
+      <div className="flex items-center gap-2 px-4 py-2 border-b border-white/[0.06]">
+        <button
+          onClick={onPrev}
+          disabled={!hasPrev}
+          aria-label="Previous item"
+          className={`flex h-7 w-7 items-center justify-center rounded-lg text-sm transition ${
+            hasPrev
+              ? "text-gray-400 hover:bg-white/[0.08] hover:text-white"
+              : "text-gray-700 cursor-not-allowed"
+          }`}
+        >
+          ←
+        </button>
+        <button
+          onClick={onNext}
+          disabled={!hasNext}
+          aria-label="Next item"
+          className={`flex h-7 w-7 items-center justify-center rounded-lg text-sm transition ${
+            hasNext
+              ? "text-gray-400 hover:bg-white/[0.08] hover:text-white"
+              : "text-gray-700 cursor-not-allowed"
+          }`}
+        >
+          →
+        </button>
+      </div>
+
       {/* ── Action + Scores (pinned below header) ── */}
       <div className="px-4 py-3 space-y-3 border-b border-white/[0.06]">
         {/* Open Article button */}
@@ -124,7 +156,7 @@ export default function PreviewPanel({ item, onClose }: Props) {
           rel="noopener noreferrer"
           className="flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-500 active:scale-95"
         >
-          Open Article
+          Open
           <svg viewBox="0 0 16 16" fill="currentColor" className="h-3.5 w-3.5">
             <path d="M3.75 2h3.5a.75.75 0 0 1 0 1.5h-3.5a.25.25 0 0 0-.25.25v8.5c0 .138.112.25.25.25h8.5a.25.25 0 0 0 .25-.25v-3.5a.75.75 0 0 1 1.5 0v3.5A1.75 1.75 0 0 1 12.25 14h-8.5A1.75 1.75 0 0 1 2 12.25v-8.5C2 2.784 2.784 2 3.75 2zm6.854.146a.5.5 0 0 1 .353-.146H14a.5.5 0 0 1 .5.5v3.043a.5.5 0 0 1-.854.353L12.5 4.75l-4.22 4.22a.5.5 0 0 1-.707-.707L11.793 4.03l-1.146-1.146a.5.5 0 0 1-.043-.738z" />
           </svg>

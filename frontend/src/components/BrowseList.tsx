@@ -10,14 +10,24 @@ interface Props {
 }
 
 export default function BrowseList({ items, pageOffset }: Props) {
-  const [previewItem, setPreviewItem] = useState<Item | null>(null);
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null);
+  const previewItem = previewIndex !== null ? items[previewIndex] ?? null : null;
   const isPanelOpen = previewItem !== null;
 
   const handlePreview = useCallback((item: Item) => {
-    setPreviewItem((prev) => (prev?.id === item.id ? null : item));
+    const idx = items.findIndex((i) => i.id === item.id);
+    setPreviewIndex((prev) => (prev === idx ? null : idx));
+  }, [items]);
+
+  const handleClose = useCallback(() => setPreviewIndex(null), []);
+
+  const handlePrev = useCallback(() => {
+    setPreviewIndex((prev) => (prev !== null && prev > 0 ? prev - 1 : prev));
   }, []);
 
-  const handleClose = useCallback(() => setPreviewItem(null), []);
+  const handleNext = useCallback(() => {
+    setPreviewIndex((prev) => (prev !== null && prev < items.length - 1 ? prev + 1 : prev));
+  }, [items.length]);
 
   return (
     <div className="flex h-full gap-3">
@@ -39,7 +49,7 @@ export default function BrowseList({ items, pageOffset }: Props) {
                   item={item}
                   rank={pageOffset + i + 1}
                   onPreview={handlePreview}
-                  isPreviewing={previewItem?.id === item.id}
+                  isPreviewing={previewIndex === i}
                 />
               ))}
             </div>
@@ -56,7 +66,14 @@ export default function BrowseList({ items, pageOffset }: Props) {
       >
         {isPanelOpen && (
           <div className="h-full rounded-2xl border border-white/[0.08] bg-[#161820] shadow-2xl shadow-black/60 overflow-hidden preview-panel-enter">
-            <PreviewPanel item={previewItem} onClose={handleClose} />
+            <PreviewPanel
+              item={previewItem}
+              onClose={handleClose}
+              onPrev={handlePrev}
+              onNext={handleNext}
+              hasPrev={previewIndex !== null && previewIndex > 0}
+              hasNext={previewIndex !== null && previewIndex < items.length - 1}
+            />
           </div>
         )}
       </div>
