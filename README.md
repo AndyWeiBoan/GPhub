@@ -1,6 +1,10 @@
-# AI Digest
+# GPhub
 
 A self-hosted tool that collects, scores and summarises the latest AI news, research papers and tools — twice a day.
+
+![img](./imgs/gphub.png)
+![img](./imgs/browse.png)
+
 
 ## Architecture
 
@@ -75,9 +79,9 @@ NEXT_PUBLIC_API_URL=http://localhost:8000 npm run dev
 | Variable | Default | Description |
 |---|---|---|
 | `ANTHROPIC_API_KEY` | — | Required. Claude Haiku API key |
-| `POSTGRES_USER` | `aidigest` | DB user |
-| `POSTGRES_PASSWORD` | `aidigest_secret` | DB password |
-| `POSTGRES_DB` | `aidigest` | DB name |
+| `POSTGRES_USER` | `gphub` | DB user |
+| `POSTGRES_PASSWORD` | `gphub_secret` | DB password |
+| `POSTGRES_DB` | `gphub` | DB name |
 
 ## API Endpoints
 
