@@ -77,7 +77,7 @@ def _impact_score(item: Item) -> float:
         weights.append(0.2); values.append(stars)
 
     if not weights:
-        return 0.1  # no signal data → small non-zero floor
+        return 0.0  # no signal data → zero impact
 
     total_weight = sum(weights)
     score = sum(w * v for w, v in zip(weights, values)) / total_weight

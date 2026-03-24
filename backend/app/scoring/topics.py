@@ -172,13 +172,19 @@ def extract_topics(
     PREFERRED_CATS = ["github_project", "product_launch", "news_article",
                       "blog_post", "community", "research_paper"]
 
+    # Minimum impact score required to be considered as a lead article.
+    # Items with no engagement signals (impact = 0.0) are deprioritised.
+    MIN_LEAD_IMPACT = 0.05
+
     def _lead_priority(item) -> tuple:
         cat = str(item.category) if item.category else "research_paper"
         cat_rank = PREFERRED_CATS.index(cat) if cat in PREFERRED_CATS else 99
         ts = scores.get(item.id, 0)
         has_real_img = bool(item.thumbnail_url and "favicon" not in item.thumbnail_url
                             and ".ico" not in item.thumbnail_url)
-        return (cat_rank, -int(has_real_img), -ts)
+        # Items below the impact threshold are sorted to the back
+        has_impact = int((item.impact_score or 0) >= MIN_LEAD_IMPACT)
+        return (-has_impact, cat_rank, -int(has_real_img), -ts)
 
     # Re-pick lead per topic using priority
     for r in results:
