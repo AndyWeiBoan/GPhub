@@ -4,6 +4,7 @@ import CategoryPill from "@/components/CategoryPill";
 import Thumb from "@/components/Thumb";
 import PhotoCredit from "@/components/PhotoCredit";
 import WeeklyDigestSection from "@/components/WeeklyDigestSection";
+import TopicCardImage from "@/components/TopicCardImage";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -332,12 +333,7 @@ function TopicMainHero({ topic, rank }: { topic: Topic; rank: number }) {
     >
       {/* Background image or gradient */}
       {realImg ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={lead.thumbnail_url!}
-          alt=""
-          className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
-        />
+        <TopicCardImage src={lead.thumbnail_url!} gradient={gradient} />
       ) : (
         <span className={`absolute inset-0 bg-gradient-to-br ${gradient}`}>
           <span className="absolute inset-0 flex items-center justify-center">
@@ -399,12 +395,7 @@ function TopicSmallCard({ topic, rank }: { topic: Topic; rank: number }) {
       className="group relative flex h-full min-h-[140px] overflow-hidden rounded-xl border border-white/[0.06] bg-[#161b27] transition hover:border-white/15"
     >
       {realImg ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={lead.thumbnail_url!}
-          alt=""
-          className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
-        />
+        <TopicCardImage src={lead.thumbnail_url!} gradient={gradient} />
       ) : (
         <span className={`absolute inset-0 bg-gradient-to-br ${gradient}`} />
       )}
@@ -450,12 +441,7 @@ function TopicWideCard({ topic, rank }: { topic: Topic; rank: number }) {
       className="group relative flex h-full min-h-[140px] overflow-hidden rounded-xl border border-white/[0.06] bg-[#161b27] transition hover:border-white/15"
     >
       {realImg ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={lead.thumbnail_url!}
-          alt=""
-          className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
-        />
+        <TopicCardImage src={lead.thumbnail_url!} gradient={gradient} />
       ) : (
         <span className={`absolute inset-0 bg-gradient-to-br ${gradient}`} />
       )}
