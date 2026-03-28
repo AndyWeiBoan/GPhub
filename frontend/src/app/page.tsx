@@ -553,11 +553,6 @@ export default async function HomePage() {
         <a href="/browse" className="text-xs text-gray-500 transition hover:text-white">Browse all →</a>
       </div>
 
-      {/* ── Weekly AI Digest ── */}
-      {digestData.digests.length > 0 && (
-        <WeeklyDigestSection data={digestData} />
-      )}
-
       {topics.length === 0 ? (
         <div className="rounded-2xl border border-white/[0.06] py-24 text-center">
           <p className="text-5xl mb-4">📭</p>
@@ -650,6 +645,11 @@ export default async function HomePage() {
 
             </div>
           </section>
+
+          {/* ══ MIDDLE: AI Weekly Digest ══════════════════════════════════ */}
+          {digestData.digests.length > 0 && (
+            <WeeklyDigestSection data={digestData} />
+          )}
 
           {/* ══ BOTTOM: Latest Items — 每排一種分類的 top 4 ════════════════ */}
           <div className="space-y-8">
