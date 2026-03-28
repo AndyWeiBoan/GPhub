@@ -567,11 +567,16 @@ export default async function HomePage() {
       ) : (
         <div className="space-y-10">
 
-          {/* ══ TOP: Hot Topics this week ════════════════════════════════════ */}
+          {/* ══ TOP: Trending Topics ══════════════════════════════════════════ */}
           <section>
-            <p className="mb-4 text-[10px] font-bold uppercase tracking-widest text-gray-500">
-              🔥 Hot Topics This Week
-            </p>
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
+                  Trending Topics
+                </p>
+                <p className="text-[10px] text-gray-600 mt-0.5">algorithm-ranked · past 7 days</p>
+              </div>
+            </div>
 
             {/*
               不規則 grid 排版（12欄）：

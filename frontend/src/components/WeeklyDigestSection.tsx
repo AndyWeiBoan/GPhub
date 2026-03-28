@@ -21,15 +21,17 @@ export default function WeeklyDigestSection({ data }: Props) {
     <section className="mb-10">
       {/* Section header */}
       <div className="mb-4 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
-            AI 週報
-          </p>
-          <span className="rounded-full bg-violet-500/15 px-2 py-0.5 text-[10px] font-semibold text-violet-400">
-            {weekStr}
-          </span>
+        <div>
+          <div className="flex items-center gap-2">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
+              AI Weekly Digest
+            </p>
+            <span className="rounded-full bg-violet-500/15 px-2 py-0.5 text-[10px] font-semibold text-violet-400">
+              {weekStr}
+            </span>
+          </div>
+          <p className="text-[10px] text-gray-600 mt-0.5">powered by Gemini</p>
         </div>
-        <p className="text-[10px] text-gray-600">由 Gemini AI 生成</p>
       </div>
 
       <div className="space-y-3">
