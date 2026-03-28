@@ -23,6 +23,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <div className="flex items-center gap-6 text-sm text-gray-400">
               <a href="/" className="transition hover:text-white">Feed</a>
               <a href="/browse" className="transition hover:text-white">Browse</a>
+              <a href="/admin" className="transition hover:text-white text-gray-600 hover:text-gray-300">Admin</a>
             </div>
           </div>
         </nav>

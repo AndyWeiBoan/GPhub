@@ -1,4 +1,5 @@
 """Orchestrate all crawlers and persist results."""
+
 import structlog
 from datetime import datetime, timezone
 from sqlalchemy import select
@@ -8,16 +9,37 @@ from app.crawlers.base import RawItem
 from app.crawlers.rss_crawler import RSSCrawler
 from app.crawlers.github_crawler import GitHubCrawler
 from app.crawlers.anthropic_crawler import AnthropicCrawler
+
 # TwitterCrawler kept for future use (requires Twitter account credentials)
 # from app.crawlers.twitter_crawler import TwitterCrawler
-from app.models import Item, Source, CrawlRun, ContentCategory, StarSnapshot
+from app.models import (
+    Item,
+    Source,
+    CrawlRun,
+    ContentCategory,
+    GithubSubcat,
+    StarSnapshot,
+)
 from app.scoring.engine import score_item
 
 log = structlog.get_logger()
 
+# Map crawler name → class (for per-crawler triggering)
+CRAWLER_MAP = {
+    "rss": RSSCrawler,
+    "github": GitHubCrawler,
+    "anthropic": AnthropicCrawler,
+}
 
-async def run_crawl(db: AsyncSession) -> dict:
-    """Run all crawlers, persist new items, return summary dict."""
+ALL_CRAWLERS = [RSSCrawler, GitHubCrawler, AnthropicCrawler]
+
+
+async def run_crawl(db: AsyncSession, crawlers: list | None = None) -> dict:
+    """Run crawlers, persist new items, return summary dict.
+
+    Args:
+        crawlers: list of crawler classes to run. Defaults to ALL_CRAWLERS.
+    """
     run = CrawlRun(started_at=datetime.now(timezone.utc))
     db.add(run)
     await db.commit()
@@ -25,7 +47,7 @@ async def run_crawl(db: AsyncSession) -> dict:
     errors = []
     all_items: list[RawItem] = []
 
-    for CrawlerClass in [RSSCrawler, GitHubCrawler, AnthropicCrawler]:
+    for CrawlerClass in crawlers or ALL_CRAWLERS:
         try:
             crawler = CrawlerClass()
             items = await crawler.fetch()
@@ -57,6 +79,7 @@ async def run_crawl(db: AsyncSession) -> dict:
         source = sources.get(raw.source_url)
         if not source:
             import uuid as _uuid
+
             source = Source(
                 id=str(_uuid.uuid4()),
                 name=raw.source_name,
@@ -107,5 +130,7 @@ async def run_crawl(db: AsyncSession) -> dict:
 
     await db.commit()
 
-    log.info("crawl_complete", fetched=len(all_items), new=items_new, errors=len(errors))
+    log.info(
+        "crawl_complete", fetched=len(all_items), new=items_new, errors=len(errors)
+    )
     return {"fetched": len(all_items), "new": items_new, "errors": errors}

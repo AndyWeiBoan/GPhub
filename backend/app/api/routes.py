@@ -1,15 +1,26 @@
 """FastAPI route definitions."""
+
 from typing import Optional
 from uuid import UUID
 
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
+
+log = structlog.get_logger()
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel, ConfigDict
 from datetime import datetime, timezone, timedelta
 
 from app.database import get_db, AsyncSessionLocal
-from app.models import Item, Source, CrawlRun, ContentCategory, GithubSubcat, StarSnapshot
+from app.models import (
+    Item,
+    Source,
+    CrawlRun,
+    ContentCategory,
+    GithubSubcat,
+    StarSnapshot,
+)
 from app.crawlers.manager import run_crawl
 from app.summarizer.claude import summarise_pending
 from app.scoring.trending import compute_trending_scores
@@ -18,6 +29,7 @@ router = APIRouter()
 
 
 # ── Schemas ───────────────────────────────────────────────────────────────────
+
 
 class ItemOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -76,7 +88,7 @@ class TrendingItemOut(BaseModel):
     credibility_score: float
     novelty_score: float
     total_score: float
-    trending_score: float   # computed on-the-fly
+    trending_score: float  # computed on-the-fly
     cross_source_count: int
 
 
@@ -140,6 +152,7 @@ class StatsOut(BaseModel):
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
+
 @router.get("/items", response_model=ItemListResponse)
 async def list_items(
     page: int = Query(1, ge=1),
@@ -147,7 +160,9 @@ async def list_items(
     category: Optional[ContentCategory] = None,
     github_subcat: Optional[GithubSubcat] = None,
     min_score: float = Query(0.0, ge=0.0, le=1.0),
-    sort_by: str = Query("total_score", pattern="^(total_score|published_at|fetched_at|github_stars)$"),
+    sort_by: str = Query(
+        "total_score", pattern="^(total_score|published_at|fetched_at|github_stars)$"
+    ),
     q: Optional[str] = Query(None, description="Keyword search on title"),
     source_name: Optional[str] = Query(None, description="Filter by exact source name"),
     db: AsyncSession = Depends(get_db),
@@ -251,7 +266,9 @@ async def get_github_ranking(
 async def get_topics(
     top_k: int = Query(6, ge=1, le=12),
     window_hours: int = Query(168, ge=24, le=720),
-    exclude: Optional[str] = Query(None, description="Comma-separated categories to exclude"),
+    exclude: Optional[str] = Query(
+        None, description="Comma-separated categories to exclude"
+    ),
     db: AsyncSession = Depends(get_db),
 ):
     """Return top trending AI topics with a lead article per topic."""
@@ -280,24 +297,26 @@ async def get_topics(
     out = []
     for t in topic_results:
         lead = t.lead_item
-        out.append(TopicOut(
-            label=t.label,
-            count=t.count,
-            lead_item=TopicLeadItem(
-                id=str(lead.id),
-                title=lead.title,
-                url=lead.url,
-                summary=lead.summary,
-                raw_content=lead.raw_content,
-                thumbnail_url=lead.thumbnail_url,
-                thumbnail_attribution=lead.thumbnail_attribution,
-                source_name=lead.source_name,
-                category=lead.category,
-                published_at=lead.published_at,
-                fetched_at=lead.fetched_at,
-                trending_score=scores.get(lead.id, 0),
-            ),
-        ))
+        out.append(
+            TopicOut(
+                label=t.label,
+                count=t.count,
+                lead_item=TopicLeadItem(
+                    id=str(lead.id),
+                    title=lead.title,
+                    url=lead.url,
+                    summary=lead.summary,
+                    raw_content=lead.raw_content,
+                    thumbnail_url=lead.thumbnail_url,
+                    thumbnail_attribution=lead.thumbnail_attribution,
+                    source_name=lead.source_name,
+                    category=lead.category,
+                    published_at=lead.published_at,
+                    fetched_at=lead.fetched_at,
+                    trending_score=scores.get(lead.id, 0),
+                ),
+            )
+        )
 
     return TopicsResponse(topics=out, window_hours=window_hours)
 
@@ -306,8 +325,12 @@ async def get_topics(
 async def get_trending(
     top_n: int = Query(10, ge=1, le=30),
     window_hours: int = Query(168, ge=24, le=720),  # default 7 days
-    exclude: Optional[str] = Query(None, description="Comma-separated categories to exclude, e.g. research_paper"),
-    include: Optional[str] = Query(None, description="Comma-separated categories to include only"),
+    exclude: Optional[str] = Query(
+        None, description="Comma-separated categories to exclude, e.g. research_paper"
+    ),
+    include: Optional[str] = Query(
+        None, description="Comma-separated categories to include only"
+    ),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -316,9 +339,7 @@ async def get_trending(
     """
     cutoff = datetime.now(timezone.utc) - timedelta(hours=window_hours)
 
-    q = select(Item).where(
-        (Item.published_at >= cutoff) | (Item.fetched_at >= cutoff)
-    )
+    q = select(Item).where((Item.published_at >= cutoff) | (Item.fetched_at >= cutoff))
 
     if include:
         cats = [c.strip() for c in include.split(",") if c.strip()]
@@ -338,6 +359,7 @@ async def get_trending(
 
     # Build coverage counts for response
     from app.scoring.trending import _build_coverage_map
+
     coverage = _build_coverage_map(pool)
 
     # ── Diversity-aware top-N selection ──────────────────────────────────────
@@ -351,14 +373,19 @@ async def get_trending(
 
     for cat in active_cats:
         # Best item of this category not yet picked
-        best = next((i for i in all_ranked if i.category == cat and i.id not in guaranteed_ids), None)
+        best = next(
+            (i for i in all_ranked if i.category == cat and i.id not in guaranteed_ids),
+            None,
+        )
         if best:
             guaranteed.append(best)
             guaranteed_ids.add(best.id)
 
     # Fill remaining slots with pure trending-score order (skip already picked)
     remaining_slots = top_n - len(guaranteed)
-    extras = [i for i in all_ranked if i.id not in guaranteed_ids][:max(remaining_slots, 0)]
+    extras = [i for i in all_ranked if i.id not in guaranteed_ids][
+        : max(remaining_slots, 0)
+    ]
 
     # Merge: guaranteed first (sorted by score), then extras
     guaranteed.sort(key=lambda x: scores.get(x.id, 0), reverse=True)
@@ -366,8 +393,11 @@ async def get_trending(
 
     out_items = [
         TrendingItemOut(
-            **{c.key: getattr(item, c.key) for c in Item.__table__.columns
-               if c.key not in ("embedding",)},
+            **{
+                c.key: getattr(item, c.key)
+                for c in Item.__table__.columns
+                if c.key not in ("embedding",)
+            },
             trending_score=scores.get(item.id, 0),
             cross_source_count=coverage.get(item.id, 1),
         )
@@ -386,10 +416,13 @@ async def get_trending(
         .where((Item.published_at >= cutoff_24h) | (Item.fetched_at >= cutoff_24h))
         .group_by(Item.category)
     )
-    total_7d_count = (await db.execute(
-        select(func.count(Item.id))
-        .where((Item.published_at >= cutoff) | (Item.fetched_at >= cutoff))
-    )).scalar_one() or 1
+    total_7d_count = (
+        await db.execute(
+            select(func.count(Item.id)).where(
+                (Item.published_at >= cutoff) | (Item.fetched_at >= cutoff)
+            )
+        )
+    ).scalar_one() or 1
 
     map_7d = {row[0]: row[1] for row in cat_7d_rows.all()}
     map_24h = {row[0]: row[1] for row in cat_24h_rows.all()}
@@ -427,17 +460,20 @@ async def get_stats(db: AsyncSession = Depends(get_db)):
     total_items = (await db.execute(select(func.count(Item.id)))).scalar_one()
     total_sources = (await db.execute(select(func.count(Source.id)))).scalar_one()
 
-    last_run = (await db.execute(
-        select(CrawlRun.finished_at)
-        .where(CrawlRun.status.in_(["success", "partial"]))
-        .order_by(CrawlRun.finished_at.desc())
-        .limit(1)
-    )).scalar_one_or_none()
+    last_run = (
+        await db.execute(
+            select(CrawlRun.finished_at)
+            .where(CrawlRun.status.in_(["success", "partial"]))
+            .order_by(CrawlRun.finished_at.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
 
-    cat_rows = (await db.execute(
-        select(Item.category, func.count(Item.id))
-        .group_by(Item.category)
-    )).all()
+    cat_rows = (
+        await db.execute(
+            select(Item.category, func.count(Item.id)).group_by(Item.category)
+        )
+    ).all()
     categories = {(row[0].value if row[0] else "unknown"): row[1] for row in cat_rows}
 
     return StatsOut(
@@ -503,8 +539,8 @@ class GithubRisingItem(BaseModel):
     source_name: Optional[str]
     github_subcat: Optional[GithubSubcat]
     github_stars: Optional[int]
-    star_delta: int          # stars gained in the window
-    star_delta_pct: float    # percentage growth
+    star_delta: int  # stars gained in the window
+    star_delta_pct: float  # percentage growth
     total_score: float
 
 
@@ -536,23 +572,27 @@ async def get_github_rising(
 
     # Fetch all snapshots within window for these items
     snap_rows = await db.execute(
-        select(StarSnapshot).where(
+        select(StarSnapshot)
+        .where(
             and_(
                 StarSnapshot.item_id.in_(list(github_items.keys())),
                 StarSnapshot.recorded_at >= cutoff,
             )
-        ).order_by(StarSnapshot.item_id, StarSnapshot.recorded_at.asc())
+        )
+        .order_by(StarSnapshot.item_id, StarSnapshot.recorded_at.asc())
     )
     snapshots = snap_rows.scalars().all()
 
     # Also fetch the most recent snapshot before the window (baseline)
     baseline_rows = await db.execute(
-        select(StarSnapshot).where(
+        select(StarSnapshot)
+        .where(
             and_(
                 StarSnapshot.item_id.in_(list(github_items.keys())),
                 StarSnapshot.recorded_at < cutoff,
             )
-        ).order_by(StarSnapshot.item_id, StarSnapshot.recorded_at.desc())
+        )
+        .order_by(StarSnapshot.item_id, StarSnapshot.recorded_at.desc())
     )
     baselines_raw = baseline_rows.scalars().all()
 
@@ -565,6 +605,7 @@ async def get_github_rising(
 
     # Group window snapshots by item
     from collections import defaultdict
+
     window_snaps: dict[str, list] = defaultdict(list)
     for snap in snapshots:
         window_snaps[str(snap.item_id)].append(snap)
@@ -583,21 +624,25 @@ async def get_github_rising(
         if delta <= 0:
             continue
 
-        delta_pct = round((delta / baseline_stars * 100) if baseline_stars > 0 else 0.0, 1)
+        delta_pct = round(
+            (delta / baseline_stars * 100) if baseline_stars > 0 else 0.0, 1
+        )
 
-        results.append(GithubRisingItem(
-            id=str(item.id),
-            title=item.title,
-            url=item.url,
-            summary=item.summary,
-            thumbnail_url=item.thumbnail_url,
-            source_name=item.source_name,
-            github_subcat=item.github_subcat,
-            github_stars=latest_stars,
-            star_delta=delta,
-            star_delta_pct=delta_pct,
-            total_score=float(item.total_score or 0),
-        ))
+        results.append(
+            GithubRisingItem(
+                id=str(item.id),
+                title=item.title,
+                url=item.url,
+                summary=item.summary,
+                thumbnail_url=item.thumbnail_url,
+                source_name=item.source_name,
+                github_subcat=item.github_subcat,
+                github_stars=latest_stars,
+                star_delta=delta,
+                star_delta_pct=delta_pct,
+                total_score=float(item.total_score or 0),
+            )
+        )
 
     # Sort by absolute delta desc
     results.sort(key=lambda x: x.star_delta, reverse=True)
@@ -613,8 +658,10 @@ async def backfill_star_snapshots(background_tasks: BackgroundTasks):
     so the next crawl can compute a meaningful delta.
     Only runs for items that have no snapshot yet.
     """
+
     async def _run():
         from sqlalchemy import and_
+
         baseline_time = datetime.now(timezone.utc) - timedelta(days=3)
         async with AsyncSessionLocal() as db:
             rows = await db.execute(
@@ -628,20 +675,20 @@ async def backfill_star_snapshots(background_tasks: BackgroundTasks):
             items = rows.scalars().all()
 
             # Find items that already have at least one snapshot
-            existing = await db.execute(
-                select(StarSnapshot.item_id).distinct()
-            )
+            existing = await db.execute(select(StarSnapshot.item_id).distinct())
             already_snapped = {str(r[0]) for r in existing.all()}
 
             count = 0
             for item in items:
                 if str(item.id) in already_snapped:
                     continue
-                db.add(StarSnapshot(
-                    item_id=item.id,
-                    stars=item.github_stars,
-                    recorded_at=baseline_time,
-                ))
+                db.add(
+                    StarSnapshot(
+                        item_id=item.id,
+                        stars=item.github_stars,
+                        recorded_at=baseline_time,
+                    )
+                )
                 count += 1
 
             await db.commit()
