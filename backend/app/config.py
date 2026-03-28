@@ -16,9 +16,14 @@ class Settings(BaseSettings):
     GEMINI_MODEL: str = "gemini-2.5-flash"
 
     # Groq API (https://console.groq.com/keys) — free tier
-    # Free tier: 14,400 req/day (llama-3.1-8b-instant) — used for comment generation
+    # Free tier: 14,400 req/day (llama-3.1-8b-instant)
     GROQ_API_KEY: str = ""
     GROQ_MODEL: str = "llama-3.1-8b-instant"
+
+    # Cerebras API (https://cloud.cerebras.ai) — free tier
+    # Free tier: 14,400 req/day (llama-3.1-8b) — faster than Groq (~0.3s/call)
+    CEREBRAS_API_KEY: str = ""
+    CEREBRAS_MODEL: str = "llama-3.1-8b"
 
     # Batch size for comment generation per crawl run
     GEMINI_COMMENT_BATCH_SIZE: int = 50

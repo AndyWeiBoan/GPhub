@@ -40,21 +40,41 @@ class CommentClient(Protocol):
 def _build_client() -> Optional[CommentClient]:
     """
     Build the best available comment client from settings.
-    Groq preferred, Gemini fallback.
-    """
-    if settings.GROQ_API_KEY:
-        from app.summarizer.groq_client import GroqClient
-        client = GroqClient(api_key=settings.GROQ_API_KEY, model=settings.GROQ_MODEL)
-        if client.available:
-            logger.info("comment_client_selected", client="groq", model=settings.GROQ_MODEL)
-            return client
 
-    if settings.GEMINI_API_KEY:
-        from app.summarizer.gemini import GeminiClient
-        client = GeminiClient(api_key=settings.GEMINI_API_KEY, model=settings.GEMINI_MODEL)
-        if client.available:
-            logger.info("comment_client_selected", client="gemini", model=settings.GEMINI_MODEL)
-            return client
+    Priority (fastest + highest free quota first):
+      1. Cerebras  — 14,400 req/day, ~0.3s/call
+      2. Groq      — 14,400 req/day, ~0.5s/call
+      3. Gemini    — 20 req/day,     ~8s/call  (fallback only)
+
+    Having multiple keys active means they are tried in order — whichever
+    initialises successfully wins. To explicitly rotate load across providers,
+    set all keys; the first available is used per process startup.
+    """
+    candidates = [
+        ("cerebras", settings.CEREBRAS_API_KEY, settings.CEREBRAS_MODEL,
+         lambda k, m: __import__(
+             "app.summarizer.cerebras_client", fromlist=["CerebrasClient"]
+         ).CerebrasClient(api_key=k, model=m)),
+        ("groq", settings.GROQ_API_KEY, settings.GROQ_MODEL,
+         lambda k, m: __import__(
+             "app.summarizer.groq_client", fromlist=["GroqClient"]
+         ).GroqClient(api_key=k, model=m)),
+        ("gemini", settings.GEMINI_API_KEY, settings.GEMINI_MODEL,
+         lambda k, m: __import__(
+             "app.summarizer.gemini", fromlist=["GeminiClient"]
+         ).GeminiClient(api_key=k, model=m)),
+    ]
+
+    for name, key, model, factory in candidates:
+        if not key:
+            continue
+        try:
+            client = factory(key, model)
+            if client.available:
+                logger.info("comment_client_selected", client=name, model=model)
+                return client
+        except Exception as e:
+            logger.warning("comment_client_init_failed", client=name, error=str(e))
 
     return None
 
@@ -106,7 +126,11 @@ async def _generate_comments(db: AsyncSession, client: CommentClient) -> int:
 
     # Pick sleep duration based on client type
     from app.summarizer.groq_client import GroqClient
-    sleep_between = _GROQ_SLEEP if isinstance(client, GroqClient) else _GEMINI_SLEEP
+    from app.summarizer.cerebras_client import CerebrasClient
+    sleep_between = (
+        _GROQ_SLEEP if isinstance(client, (GroqClient, CerebrasClient))
+        else _GEMINI_SLEEP
+    )
 
     logger.info(
         "comment_generation_started",
