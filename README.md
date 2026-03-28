@@ -101,6 +101,72 @@ Change via `SCHEDULE_HOURS` in `backend/app/config.py`.
 
 ## Frontend Layout
 
+### Feed Page (`/`)
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  This Week in AI                              Browse all →           │
+│  Top trending topics · past 7 days                                   │
+└─────────────────────────────────────────────────────────────────────┘
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  TRENDING TOPICS  ━━━━━━━━━━━━━━━━━━━━━━
+  algorithm-ranked · past 7 days
+
+  ┌──────────────────────────────┬─────────────┬─────────────┐
+  │                              │     #2      │     #3      │
+  │             #1               │  SmallCard  │  SmallCard  │
+  │          MainHero            ├─────────────┴─────────────┤
+  │        (6col × 2row)         │             #4            │
+  │                              │          WideCard         │
+  ├────────────┬────────┬────────┼─────────────┬─────────────┤
+  │    M-1     │  M-2   │  M-3  │     #5      │     #6      │
+  │  MedCard   │ MedCard│MedCard│  SmallCard  │  SmallCard  │
+  └────────────┴────────┴───────┴─────────────┴─────────────┘
+
+  #1–#6  = Topic cards (no github_project — see GitHub Rising below)
+  M-1–M-3 = Top trending items (any category, deduplicated)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  AI WEEKLY DIGEST  ━━━━━━━━━━━━━━━━━━━━━
+  powered by Gemini  ·  Week XX, YYYY
+  (hidden when no digest data available)
+
+  ┌──────────────────────────────────────────────────────────┐
+  │  [Featured event title]                                  │
+  │  AI analysis text (100-200 chars) ...                    │
+  │  Related: [article 1] [article 2] [article 3]           │
+  ├────────────────────┬─────────────────────────────────────┤
+  │  [Event 2 title]   │  [Event 3 title]  │  [Event 4]     │
+  │  Short analysis... │  Short analysis...│  ...           │
+  └────────────────────┴───────────────────┴────────────────┘
+
+━━━━━━━━━━━━━━━━━━━━  LATEST · BLOG  (top 4 by score)  ━━━━━━━━━━━━━━━
+  ┌──────────┬──────────┬──────────┬──────────┐
+  │ MedCard  │ MedCard  │ MedCard  │ MedCard  │
+  └──────────┴──────────┴──────────┴──────────┘
+
+━━━━━━━━━━━━━━━━━━━  LATEST · GITHUB  (top 4 by score)  ━━━━━━━━━━━━━━
+  ┌──────────┬──────────┬──────────┬──────────┐
+  │ MedCard  │ MedCard  │ MedCard  │ MedCard  │
+  └──────────┴──────────┴──────────┴──────────┘
+
+  ⭐ RISING THIS WEEK  (GitHub star velocity, past 48h)
+  ┌──────────────────────────────────────────────────┐
+  │ #1  repo/name  ████████  +1,234 stars  (+42%)   │
+  │ #2  repo/name  ██████    +890 stars    (+31%)   │
+  │ ...  (up to 8 items)                            │
+  └──────────────────────────────────────────────────┘
+
+━━━━━━━━━━━━━━━━━━  LATEST · PRODUCTS  (top 4 by score)  ━━━━━━━━━━━━━
+  ┌──────────┬──────────┬──────────┬──────────┐
+  │ MedCard  │ MedCard  │ MedCard  │ MedCard  │
+  └──────────┴──────────┴──────────┴──────────┘
+
+━━━━━━━━━━━━━━━━━━━  LATEST · NEWS  (top 4 by score)  ━━━━━━━━━━━━━━━━
+  ┌──────────┬──────────┬──────────┬──────────┐
+  │ MedCard  │ MedCard  │ MedCard  │ MedCard  │
+  └──────────┴──────────┴──────────┴──────────┘
+```
+
 ### Trending Topics Grid (12-column)
 
 ```
