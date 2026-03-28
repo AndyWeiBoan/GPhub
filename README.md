@@ -99,6 +99,61 @@ NEXT_PUBLIC_API_URL=http://localhost:8000 npm run dev
 Crawls run at **06:00 UTC** and **18:00 UTC** by default.
 Change via `SCHEDULE_HOURS` in `backend/app/config.py`.
 
+## Frontend Layout
+
+### Trending Topics Grid (12-column)
+
+```
+col:  1    2    3    4    5    6    7    8    9   10   11   12
+     ┌────────────────────────────┬─────────────┬─────────────┐
+row1 │                            │     #2      │     #3      │
+     │            #1              │  SmallCard  │  SmallCard  │
+row2 │        MainHero            ├─────────────┴─────────────┤
+     │      (6col × 2row)         │           #4              │
+     │                            │        WideCard           │
+     ├──────────┬──────────┬──────┤   (6col × 1row)           │
+row3 │   M-1    │   M-2    │  M-3 ├─────────────┬─────────────┤
+     │  Medium  │  Medium  │ Med  │     #5      │     #6      │
+     │   Card   │   Card   │ Card │  SmallCard  │  SmallCard  │
+     └──────────┴──────────┴──────┴─────────────┴─────────────┘
+
+#1  TopicMainHero  — col 1-6,  row 1-2  (large hero, full image + AI comment)
+#2  TopicSmallCard — col 7-9,  row 1
+#3  TopicSmallCard — col 10-12, row 1
+#4  TopicWideCard  — col 7-12, row 2    (wide landscape card)
+#5  TopicSmallCard — col 7-9,  row 3
+#6  TopicSmallCard — col 10-12, row 3
+M   MediumCard     — col 1-6,  row 3    (3 trending items, not topic cards)
+```
+
+**Card types:**
+
+| Card | Ranks | Size | Image fallback |
+|---|---|---|---|
+| `TopicMainHero` | #1 | 6col × 2row | Category gradient + emoji |
+| `TopicSmallCard` | #2 #3 #5 #6 | 3col × 1row | Category gradient |
+| `TopicWideCard` | #4 | 6col × 1row | Category gradient |
+| `MediumCard` | M-1 M-2 M-3 | 2col × 1row | No image |
+
+Images fall back to category gradient when thumbnail is unavailable or low-quality
+(GitHub avatars, Reddit icons, Dev.to white-background OG images are excluded).
+
+### AI Comment Routing
+
+```
+Category          Client              Daily quota
+──────────────    ──────────────────  ───────────
+news_article   →  Cerebras (primary)  14,400 req
+blog_post      →  Cerebras / Groq     14,400 req  (paywall items skipped)
+research_paper →  Cerebras / Groq     14,400 req
+product_launch →  Cerebras / Groq     14,400 req
+community      →  Cerebras / Groq     14,400 req
+github_project →  Gemini 2.5 Flash        20 req  (skip if quota gone)
+
+Top 60 items per category per crawl run.
+Already-commented items are never re-processed.
+```
+
 ## Adding a New Source
 
 1. Add a row to `backend/migrations/init.sql` (for new installs) **or** `INSERT` directly into the `sources` table.
