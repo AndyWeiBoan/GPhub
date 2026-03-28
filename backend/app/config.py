@@ -25,8 +25,8 @@ class Settings(BaseSettings):
     CEREBRAS_API_KEY: str = ""
     CEREBRAS_MODEL: str = "llama-3.1-8b"
 
-    # Batch size for comment generation per crawl run
-    GEMINI_COMMENT_BATCH_SIZE: int = 50
+    # Max items per DB fetch chunk in comment generation (memory guard)
+    COMMENT_FETCH_CHUNK: int = 500
 
     # NewsAPI (https://newsapi.org/) — free tier: 100 req/day
     NEWS_API_KEY: str = ""
