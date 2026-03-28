@@ -16,7 +16,7 @@ from app.crawlers.manager import run_crawl, CRAWLER_MAP, ALL_CRAWLERS
 from app.crawlers.og_fetcher import enrich_thumbnails
 from app.crawlers.pexels_fetcher import enrich_with_pexels
 from app.summarizer.claude import summarise_pending
-from app.summarizer.comment_generator import run_comment_generation
+from app.summarizer.comment_generator import run_comment_generation, _build_client
 from app.summarizer.digest_generator import run_digest_generation
 from app.summarizer.gemini import GeminiClient
 from app.scoring.engine import score_item
@@ -206,8 +206,10 @@ async def trigger_crawl_all(background_tasks: BackgroundTasks):
 
             await asyncio.gather(_og(), _claude())
 
-            # ── Phase 3: Pexels ∥ Gemini comments (parallel) ─────────────────
-            gemini = GeminiClient(
+            # ── Phase 3: Pexels ∥ AI comments (parallel) ─────────────────────
+            # Groq for comments (14,400 req/day), Gemini for digest (quality)
+            comment_client = _build_client()
+            gemini_client = GeminiClient(
                 api_key=_settings.GEMINI_API_KEY,
                 model=_settings.GEMINI_MODEL,
             ) if _settings.GEMINI_API_KEY else None
@@ -219,23 +221,23 @@ async def trigger_crawl_all(background_tasks: BackgroundTasks):
                 _step_done(job, 3, f"Pexels {n} 張")
                 return n
 
-            async def _gemini_comments():
-                if not gemini:
-                    _step_done(job, 4, "跳過 (無 GEMINI_API_KEY)")
+            async def _ai_comments():
+                if not comment_client:
+                    _step_done(job, 4, "跳過 (無 LLM API key)")
                     return 0
                 _step_start(job, 4)
                 async with AsyncSessionLocal() as db:
-                    n = await run_comment_generation(db=db, gemini=gemini)
-                _step_done(job, 4, f"短評 {n} 筆")
+                    n = await run_comment_generation(db=db, client=comment_client)
+                _step_done(job, 4, f"短評 {n} 筆 ({comment_client.model_label})")
                 return n
 
-            await asyncio.gather(_pexels(), _gemini_comments())
+            await asyncio.gather(_pexels(), _ai_comments())
 
-            # ── Phase 4: Gemini digest (sequential — same quota) ──────────────
-            if gemini:
+            # ── Phase 4: Gemini digest (sequential — quality reasoning) ────────
+            if gemini_client:
                 _step_start(job, 5)
                 async with AsyncSessionLocal() as db:
-                    nd = await run_digest_generation(db=db, gemini=gemini)
+                    nd = await run_digest_generation(db=db, gemini=gemini_client)
                 _step_done(job, 5, f"週報 {nd} 則")
             else:
                 _step_done(job, 5, "跳過 (無 GEMINI_API_KEY)")

@@ -11,9 +11,15 @@ class Settings(BaseSettings):
     PEXELS_API_KEY: str = ""
 
     # Google Gemini API (https://aistudio.google.com/apikey) — free tier
-    # Free tier: 15 req/min, 1500 req/day (gemini-2.5-flash)
+    # Free tier: 20 req/day (gemini-2.5-flash) — used for weekly digest only
     GEMINI_API_KEY: str = ""
     GEMINI_MODEL: str = "gemini-2.5-flash"
+
+    # Groq API (https://console.groq.com/keys) — free tier
+    # Free tier: 14,400 req/day (llama-3.1-8b-instant) — used for comment generation
+    GROQ_API_KEY: str = ""
+    GROQ_MODEL: str = "llama-3.1-8b-instant"
+
     # Batch size for comment generation per crawl run
     GEMINI_COMMENT_BATCH_SIZE: int = 50
 

@@ -13,7 +13,7 @@ from app.crawlers.manager import run_crawl
 from app.crawlers.og_fetcher import enrich_thumbnails
 from app.crawlers.pexels_fetcher import enrich_with_pexels
 from app.summarizer.claude import summarise_pending
-from app.summarizer.comment_generator import run_comment_generation
+from app.summarizer.comment_generator import run_comment_generation, _build_client
 from app.summarizer.digest_generator import run_digest_generation
 from app.summarizer.gemini import GeminiClient
 
@@ -60,28 +60,30 @@ async def crawl_and_summarise():
             log.info("pexels_enriched", count=n)
             return n
 
-    async def _gemini_comments(gemini: GeminiClient | None):
-        if not gemini:
-            return 0
-        async with AsyncSessionLocal() as db:
-            n = await run_comment_generation(db=db, gemini=gemini)
-            log.info("gemini_comments_done", count=n)
-            return n
-
-    gemini = GeminiClient(
+    # Build clients — Groq for comments, Gemini for digest
+    comment_client = _build_client()  # Groq preferred, Gemini fallback
+    gemini_client = GeminiClient(
         api_key=settings.GEMINI_API_KEY,
         model=settings.GEMINI_MODEL,
     ) if settings.GEMINI_API_KEY else None
 
+    async def _gemini_comments():
+        if not comment_client:
+            return 0
+        async with AsyncSessionLocal() as db:
+            n = await run_comment_generation(db=db, client=comment_client)
+            log.info("comment_generation_done", count=n, model=comment_client.model_label)
+            return n
+
     pexels_count, comment_count = await asyncio.gather(
         _pexels(),
-        _gemini_comments(gemini),
+        _gemini_comments(),
     )
 
-    # ── Phase 4: Gemini digest (sequential — same quota as comments) ──────────
-    if gemini:
+    # ── Phase 4: Gemini digest (sequential — reserved for quality reasoning) ──
+    if gemini_client:
         async with AsyncSessionLocal() as db:
-            digested = await run_digest_generation(db=db, gemini=gemini)
+            digested = await run_digest_generation(db=db, gemini=gemini_client)
             log.info("gemini_digest_done", count=digested)
     else:
         log.info("gemini_skipped", reason="GEMINI_API_KEY not set")
