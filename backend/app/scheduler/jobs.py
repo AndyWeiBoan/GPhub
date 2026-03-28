@@ -21,35 +21,65 @@ log = structlog.get_logger()
 
 
 async def crawl_and_summarise():
-    """Full pipeline: crawl → score → enrich OG → pexels → Claude summary → Gemini comments → Gemini digest."""
+    """
+    Full pipeline with maximum parallelism:
+
+    Phase 1 (sequential): Crawl
+    Phase 2 (parallel):   OG fetch  ∥  Claude summary
+    Phase 3 (parallel):   Pexels    ∥  Gemini comments  (each waits on its phase-2 dep)
+    Phase 4 (sequential): Gemini digest
+    """
     log.info("scheduled_job_start")
+
+    # ── Phase 1: Crawl ────────────────────────────────────────────────────────
     async with AsyncSessionLocal() as db:
         crawl_result = await run_crawl(db)
         log.info("crawl_done", **crawl_result)
 
-    async with AsyncSessionLocal() as db:
-        enriched = await enrich_thumbnails(db, batch=50)
-        log.info("og_enriched", count=enriched)
-
-    # Pexels runs AFTER OG fetch so it only fills what OG couldn't
-    async with AsyncSessionLocal() as db:
-        pexels_count = await enrich_with_pexels(db)
-        log.info("pexels_enriched", count=pexels_count)
-
-    async with AsyncSessionLocal() as db:
-        summarised = await summarise_pending(db)
-        log.info("summarise_done", count=summarised)
-
-    # Gemini AI comments and weekly digest (graceful skip if no API key)
-    if settings.GEMINI_API_KEY:
-        gemini = GeminiClient(
-            api_key=settings.GEMINI_API_KEY,
-            model=settings.GEMINI_MODEL,
-        )
+    # ── Phase 2: OG fetch ∥ Claude summary ───────────────────────────────────
+    async def _og():
         async with AsyncSessionLocal() as db:
-            commented = await run_comment_generation(db=db, gemini=gemini)
-            log.info("gemini_comments_done", count=commented)
+            n = await enrich_thumbnails(db, batch=50)
+            log.info("og_enriched", count=n)
+            return n
 
+    async def _claude():
+        async with AsyncSessionLocal() as db:
+            n = await summarise_pending(db)
+            log.info("summarise_done", count=n)
+            return n
+
+    og_count, claude_count = await asyncio.gather(_og(), _claude())
+
+    # ── Phase 3: Pexels ∥ Gemini comments ────────────────────────────────────
+    # Pexels fills what OG missed (OG already done)
+    # Gemini comments use item.summary written by Claude (Claude already done)
+    async def _pexels():
+        async with AsyncSessionLocal() as db:
+            n = await enrich_with_pexels(db)
+            log.info("pexels_enriched", count=n)
+            return n
+
+    async def _gemini_comments(gemini: GeminiClient | None):
+        if not gemini:
+            return 0
+        async with AsyncSessionLocal() as db:
+            n = await run_comment_generation(db=db, gemini=gemini)
+            log.info("gemini_comments_done", count=n)
+            return n
+
+    gemini = GeminiClient(
+        api_key=settings.GEMINI_API_KEY,
+        model=settings.GEMINI_MODEL,
+    ) if settings.GEMINI_API_KEY else None
+
+    pexels_count, comment_count = await asyncio.gather(
+        _pexels(),
+        _gemini_comments(gemini),
+    )
+
+    # ── Phase 4: Gemini digest (sequential — same quota as comments) ──────────
+    if gemini:
         async with AsyncSessionLocal() as db:
             digested = await run_digest_generation(db=db, gemini=gemini)
             log.info("gemini_digest_done", count=digested)

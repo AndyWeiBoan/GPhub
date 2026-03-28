@@ -164,12 +164,12 @@ async def list_jobs(limit: int = Query(10, ge=1, le=50)):
 # ── Crawl triggers ────────────────────────────────────────────────────────────
 
 FULL_CRAWL_STEPS = [
-    "爬蟲 (RSS + GitHub + Anthropic)",
-    "OG 圖片補全",
-    "Pexels 圖片",
-    "AI 摘要 (Claude)",
-    "AI 短評 (Gemini)",
-    "週報摘要 (Gemini)",
+    "爬蟲 (RSS + GitHub + Anthropic)",   # 0 — Phase 1
+    "OG 圖片補全",                         # 1 — Phase 2a ∥
+    "AI 摘要 (Claude)",                   # 2 — Phase 2b ∥
+    "Pexels 圖片",                         # 3 — Phase 3a ∥
+    "AI 短評 (Gemini)",                   # 4 — Phase 3b ∥
+    "週報摘要 (Gemini)",                   # 5 — Phase 4
 ]
 SINGLE_CRAWL_STEPS = ["爬蟲", "OG 圖片補全"]
 RESCORE_STEPS = ["重新評分"]
@@ -181,48 +181,63 @@ async def trigger_crawl_all(background_tasks: BackgroundTasks):
 
     async def _run():
         try:
-            # Step 0: crawl
+            from app.config import settings as _settings
+
+            # ── Phase 1: Crawl ────────────────────────────────────────────────
             _step_start(job, 0)
             async with AsyncSessionLocal() as db:
                 r = await run_crawl(db)
             _step_done(job, 0, f"抓取 {r['fetched']}，新增 {r['new']} 筆")
 
-            # Step 1: OG thumbnails
-            _step_start(job, 1)
-            async with AsyncSessionLocal() as db:
-                n = await enrich_thumbnails(db, batch=50)
-            _step_done(job, 1, f"補全 {n} 張")
+            # ── Phase 2: OG ∥ Claude (parallel) ──────────────────────────────
+            async def _og():
+                _step_start(job, 1)
+                async with AsyncSessionLocal() as db:
+                    n = await enrich_thumbnails(db, batch=50)
+                _step_done(job, 1, f"補全 {n} 張")
+                return n
 
-            # Step 2: Pexels
-            _step_start(job, 2)
-            async with AsyncSessionLocal() as db:
-                n = await enrich_with_pexels(db)
-            _step_done(job, 2, f"Pexels {n} 張")
+            async def _claude():
+                _step_start(job, 2)
+                async with AsyncSessionLocal() as db:
+                    n = await summarise_pending(db)
+                _step_done(job, 2, f"摘要 {n} 筆")
+                return n
 
-            # Step 3: Claude summarise
-            _step_start(job, 3)
-            async with AsyncSessionLocal() as db:
-                n = await summarise_pending(db)
-            _step_done(job, 3, f"摘要 {n} 筆")
+            await asyncio.gather(_og(), _claude())
 
-            # Step 4 & 5: Gemini comments + digest (graceful skip if no key)
-            from app.config import settings as _settings
-            if _settings.GEMINI_API_KEY:
-                gemini = GeminiClient(
-                    api_key=_settings.GEMINI_API_KEY,
-                    model=_settings.GEMINI_MODEL,
-                )
+            # ── Phase 3: Pexels ∥ Gemini comments (parallel) ─────────────────
+            gemini = GeminiClient(
+                api_key=_settings.GEMINI_API_KEY,
+                model=_settings.GEMINI_MODEL,
+            ) if _settings.GEMINI_API_KEY else None
+
+            async def _pexels():
+                _step_start(job, 3)
+                async with AsyncSessionLocal() as db:
+                    n = await enrich_with_pexels(db)
+                _step_done(job, 3, f"Pexels {n} 張")
+                return n
+
+            async def _gemini_comments():
+                if not gemini:
+                    _step_done(job, 4, "跳過 (無 GEMINI_API_KEY)")
+                    return 0
                 _step_start(job, 4)
                 async with AsyncSessionLocal() as db:
-                    nc = await run_comment_generation(db=db, gemini=gemini)
-                _step_done(job, 4, f"短評 {nc} 筆")
+                    n = await run_comment_generation(db=db, gemini=gemini)
+                _step_done(job, 4, f"短評 {n} 筆")
+                return n
 
+            await asyncio.gather(_pexels(), _gemini_comments())
+
+            # ── Phase 4: Gemini digest (sequential — same quota) ──────────────
+            if gemini:
                 _step_start(job, 5)
                 async with AsyncSessionLocal() as db:
                     nd = await run_digest_generation(db=db, gemini=gemini)
                 _step_done(job, 5, f"週報 {nd} 則")
             else:
-                _step_done(job, 4, "跳過 (無 GEMINI_API_KEY)")
                 _step_done(job, 5, "跳過 (無 GEMINI_API_KEY)")
 
             _job_done(job, {"fetched": r["fetched"], "new": r["new"]})
