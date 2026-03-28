@@ -163,6 +163,9 @@ async def list_jobs(limit: int = Query(10, ge=1, le=50)):
 
 # ── Crawl triggers ────────────────────────────────────────────────────────────
 
+COMMENT_STEPS = ["AI 短評生成"]
+DIGEST_STEPS  = ["AI 週報摘要生成"]
+
 FULL_CRAWL_STEPS = [
     "爬蟲 (RSS + GitHub + Anthropic)",   # 0 — Phase 1
     "OG 圖片補全",                         # 1 — Phase 2a ∥
@@ -375,6 +378,66 @@ async def trigger_rescore(background_tasks: BackgroundTasks):
 
     background_tasks.add_task(_run)
     return {"job_id": job.job_id, "message": "Full rescore triggered"}
+
+
+# ── AI workload triggers ──────────────────────────────────────────────────────
+
+
+@router.post("/trigger-comments")
+async def trigger_comments(background_tasks: BackgroundTasks):
+    """Standalone trigger: generate AI comments for pending items."""
+    job = _new_job("Generate AI Comments", COMMENT_STEPS)
+
+    async def _run():
+        try:
+            from app.config import settings as _settings
+            client = _build_client()
+            if not client:
+                _step_done(job, 0, "跳過 (無 LLM API key)")
+                _job_done(job, {"commented": 0})
+                return
+
+            _step_start(job, 0)
+            async with AsyncSessionLocal() as db:
+                n = await run_comment_generation(db=db, client=client)
+            _step_done(job, 0, f"{n} 筆 ({client.model_label})")
+            _job_done(job, {"commented": n})
+        except Exception as e:
+            _job_error(job, str(e))
+            log.error("admin_trigger_comments_failed", error=str(e))
+
+    background_tasks.add_task(_run)
+    return {"job_id": job.job_id, "message": "Comment generation triggered"}
+
+
+@router.post("/trigger-digest")
+async def trigger_digest(background_tasks: BackgroundTasks):
+    """Standalone trigger: regenerate this week's AI digest."""
+    job = _new_job("Generate Weekly Digest", DIGEST_STEPS)
+
+    async def _run():
+        try:
+            from app.config import settings as _settings
+            if not _settings.GEMINI_API_KEY:
+                _step_done(job, 0, "跳過 (無 GEMINI_API_KEY)")
+                _job_done(job, {"digests": 0})
+                return
+
+            gemini = GeminiClient(
+                api_key=_settings.GEMINI_API_KEY,
+                model=_settings.GEMINI_MODEL,
+            )
+            _step_start(job, 0)
+            async with AsyncSessionLocal() as db:
+                n = await run_digest_generation(db=db, gemini=gemini)
+            _step_done(job, 0, f"{n} 則")
+            _job_done(job, {"digests": n})
+        except Exception as e:
+            _job_error(job, str(e))
+            log.error("admin_trigger_digest_failed", error=str(e))
+
+    background_tasks.add_task(_run)
+    return {"job_id": job.job_id, "message": "Digest generation triggered"}
 
 
 # ── Sources CRUD ──────────────────────────────────────────────────────────────

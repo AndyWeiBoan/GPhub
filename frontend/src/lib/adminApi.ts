@@ -135,6 +135,12 @@ export const triggerCrawlCategory = (category: ContentCategory) =>
 export const triggerRescore = () =>
   req<{ job_id: string; message: string }>("/trigger-rescore", { method: "POST" });
 
+export const triggerComments = () =>
+  req<{ job_id: string; message: string }>("/trigger-comments", { method: "POST" });
+
+export const triggerDigest = () =>
+  req<{ job_id: string; message: string }>("/trigger-digest", { method: "POST" });
+
 // ── sources ───────────────────────────────────────────────────────────────────
 
 export const fetchSources = (params?: {

@@ -7,6 +7,8 @@ import {
   triggerCrawlOne,
   triggerCrawlCategory,
   triggerRescore,
+  triggerComments,
+  triggerDigest,
   fetchJob,
   CRAWLER_NAMES,
   CATEGORY_LABELS,
@@ -277,6 +279,23 @@ export default function CrawlPage() {
             label="🔄 Rescore All Items"
             sublabel="重新計算所有 items 的分數"
             onClick={() => run(triggerRescore)}
+          />
+        </div>
+      </section>
+
+      {/* AI workloads */}
+      <section className="space-y-3">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-500">AI 工作</h2>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <ActionButton
+            label="💬 Generate Comments"
+            sublabel="對所有待處理 items 生成 AI 短評 (Groq → Gemini fallback)"
+            onClick={() => run(triggerComments)}
+          />
+          <ActionButton
+            label="📰 Generate Weekly Digest"
+            sublabel="重新生成本週 AI 週報摘要 (Gemini)"
+            onClick={() => run(triggerDigest)}
           />
         </div>
       </section>
