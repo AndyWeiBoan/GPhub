@@ -1,22 +1,24 @@
 """
-Batch AI comment generator.
+AI comment generator — top-60-per-category strategy.
 
-Category priority (Cerebras/Groq handle all except github):
-  1. news_article    → fast client (Cerebras → Groq)
-  2. blog_post       → fast client
-  3. research_paper  → fast client
-  4. product_launch  → fast client
-  5. community       → fast client
-  6. github_project  → Gemini only (skip if Gemini quota exhausted)
+Per run:
+  Fast client (Cerebras → Groq):
+    news_article    top 60 by total_score
+    blog_post       top 60 (skip paywalled: short content OR known paywall domain)
+    research_paper  top 60
+    product_launch  top 60
+    community       top 60
 
-Runs continuously until quota is hit (no fixed batch cap).
-Already-commented items are always skipped.
+  Gemini only:
+    github_project  top 60 (skipped if no Gemini key / quota gone)
+
+Already-commented items (ai_comment IS NOT NULL) are never touched.
 """
 import asyncio
 from typing import Optional, Protocol
 
 import structlog
-from sqlalchemy import select, update, case
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -25,17 +27,19 @@ from app.models import Item, ContentCategory
 
 logger = structlog.get_logger(__name__)
 
-# Category priority — lower number = processed first
-CATEGORY_PRIORITY: dict[str, int] = {
-    ContentCategory.news_article.value:   1,
-    ContentCategory.blog_post.value:      2,
-    ContentCategory.research_paper.value: 3,
-    ContentCategory.product_launch.value: 4,
-    ContentCategory.community.value:      5,
-    ContentCategory.github_project.value: 6,
-}
+# Items per category per run
+TOP_N_PER_CATEGORY = 60
 
-# Categories handled by fast clients (Cerebras/Groq)
+# Blog paywall detection
+PAYWALL_DOMAINS = {
+    "medium.com", "wired.com", "nytimes.com", "wsj.com", "ft.com",
+    "technologyreview.com", "theatlantic.com", "bloomberg.com",
+    "washingtonpost.com", "economist.com", "hbr.org", "forbes.com",
+    "businessinsider.com", "theinformation.com",
+}
+PAYWALL_MIN_CONTENT_LEN = 200  # shorter than this = likely truncated/paywalled
+
+# Categories for fast client, in priority order
 FAST_CATEGORIES = [
     ContentCategory.news_article,
     ContentCategory.blog_post,
@@ -44,17 +48,12 @@ FAST_CATEGORIES = [
     ContentCategory.community,
 ]
 
-# Categories handled by Gemini only
 GEMINI_CATEGORIES = [
     ContentCategory.github_project,
 ]
 
-# No sleep for fast inference providers
-_FAST_SLEEP = 0.0
+_FAST_SLEEP   = 0.0
 _GEMINI_SLEEP = 1.0
-
-# Fetch this many items per DB query to avoid loading everything into memory
-_FETCH_CHUNK = 100
 
 
 class CommentClient(Protocol):
@@ -66,10 +65,7 @@ class CommentClient(Protocol):
 
 
 def _build_fast_client() -> Optional[CommentClient]:
-    """
-    Build fastest available client: Cerebras → Groq → (no Gemini).
-    Used for all non-github categories.
-    """
+    """Cerebras → Groq. No Gemini."""
     candidates = [
         ("cerebras", settings.CEREBRAS_API_KEY, settings.CEREBRAS_MODEL,
          lambda k, m: __import__(
@@ -80,42 +76,51 @@ def _build_fast_client() -> Optional[CommentClient]:
              "app.summarizer.groq_client", fromlist=["GroqClient"]
          ).GroqClient(api_key=k, model=m)),
     ]
-
     for name, key, model, factory in candidates:
         if not key:
             continue
         try:
             client = factory(key, model)
             if client.available:
-                logger.info("comment_client_selected", client=name, model=model, role="fast")
+                logger.info("comment_client_selected", client=name, model=model)
                 return client
         except Exception as e:
             logger.warning("comment_client_init_failed", client=name, error=str(e))
-
     return None
 
 
 def _build_gemini_client() -> Optional[CommentClient]:
-    """
-    Build Gemini client exclusively — used for github_project category.
-    Returns None if no Gemini key set.
-    """
+    """Gemini only — for github_project."""
     if not settings.GEMINI_API_KEY:
         return None
     try:
         from app.summarizer.gemini import GeminiClient
         client = GeminiClient(api_key=settings.GEMINI_API_KEY, model=settings.GEMINI_MODEL)
         if client.available:
-            logger.info("comment_client_selected", client="gemini", model=settings.GEMINI_MODEL, role="github")
+            logger.info("comment_client_selected", client="gemini", model=settings.GEMINI_MODEL)
             return client
     except Exception as e:
         logger.warning("comment_client_init_failed", client="gemini", error=str(e))
     return None
 
 
-# Legacy: kept for backwards compat — returns fast client
+# Legacy alias
 def _build_client() -> Optional[CommentClient]:
     return _build_fast_client()
+
+
+def _is_paywalled(item: Item) -> bool:
+    """Return True if a blog post is likely paywalled and has no useful content."""
+    # Check known paywall domains
+    url = item.url or ""
+    for domain in PAYWALL_DOMAINS:
+        if domain in url:
+            return True
+    # Check content length — too short means truncated/blocked
+    content = item.summary or item.raw_content or ""
+    if len(content.strip()) < PAYWALL_MIN_CONTENT_LEN:
+        return True
+    return False
 
 
 async def run_comment_generation(
@@ -124,15 +129,14 @@ async def run_comment_generation(
     gemini=None,  # legacy kwarg
 ) -> int:
     """
-    Generate ai_comment for all pending items, prioritised by category.
-    Runs until quota is exhausted (API errors stop the run).
+    Generate comments for top 60 items per category.
+    Already-commented items are skipped (ai_comment IS NULL filter).
     Returns total number of items successfully commented.
     """
-    # Backwards compat
     if client is None and gemini is not None:
         client = gemini
 
-    fast_client = client or _build_fast_client()
+    fast_client   = client or _build_fast_client()
     gemini_client = _build_gemini_client()
 
     if not fast_client and not gemini_client:
@@ -146,19 +150,17 @@ async def run_comment_generation(
     try:
         total = 0
 
-        # ── Pass 1: Fast categories (Cerebras/Groq) ──────────────────────────
+        # ── Fast categories ───────────────────────────────────────────────────
         if fast_client:
-            n = await _generate_for_categories(
-                db, fast_client, FAST_CATEGORIES, sleep=_FAST_SLEEP
-            )
-            total += n
+            for category in FAST_CATEGORIES:
+                n = await _process_category(db, fast_client, category, _FAST_SLEEP)
+                total += n
 
-        # ── Pass 2: GitHub (Gemini only) ─────────────────────────────────────
+        # ── GitHub via Gemini ─────────────────────────────────────────────────
         if gemini_client:
-            n = await _generate_for_categories(
-                db, gemini_client, GEMINI_CATEGORIES, sleep=_GEMINI_SLEEP
-            )
-            total += n
+            for category in GEMINI_CATEGORIES:
+                n = await _process_category(db, gemini_client, category, _GEMINI_SLEEP)
+                total += n
         else:
             logger.info("github_comments_skipped", reason="no GEMINI_API_KEY")
 
@@ -170,49 +172,41 @@ async def run_comment_generation(
             await db.close()
 
 
-async def _generate_for_categories(
+async def _process_category(
     db: AsyncSession,
     client: CommentClient,
-    categories: list,
+    category: ContentCategory,
     sleep: float,
 ) -> int:
     """
-    Fetch all pending items in the given categories (priority order),
-    generate comments until quota is exhausted.
-    Returns number of successfully commented items.
+    Fetch top TOP_N_PER_CATEGORY uncommented items for one category,
+    generate comments, stop on quota exhaustion.
     """
-    # Build priority ordering expression for SQLAlchemy
-    priority_case = case(
-        {cat.value: CATEGORY_PRIORITY[cat.value] for cat in categories},
-        value=Item.category,
-        else_=99,
-    )
-
     result = await db.execute(
         select(Item)
         .where(
             Item.ai_comment == None,  # noqa: E711
-            Item.category.in_([c.value for c in categories]),
+            Item.category == category.value,
         )
-        .order_by(priority_case, Item.total_score.desc())
-        .limit(settings.COMMENT_FETCH_CHUNK)
+        .order_by(Item.total_score.desc())
+        .limit(TOP_N_PER_CATEGORY)
     )
     items = result.scalars().all()
 
     if not items:
-        logger.info("comment_generation_nothing_to_do",
-                    categories=[c.value for c in categories])
+        logger.info("category_nothing_to_do", category=category.value)
         return 0
 
-    logger.info(
-        "comment_generation_started",
-        categories=[c.value for c in categories],
-        total=len(items),
-        model=client.model_label,
-    )
+    logger.info("category_comment_start",
+                category=category.value, count=len(items), model=client.model_label)
 
     success = 0
     for i, item in enumerate(items):
+        # Skip paywalled blog posts
+        if category == ContentCategory.blog_post and _is_paywalled(item):
+            logger.debug("blog_paywall_skip", item_id=str(item.id), url=item.url)
+            continue
+
         content = item.summary or item.raw_content or ""
         comment = await client.generate_comment(item.title, content)
 
@@ -224,33 +218,22 @@ async def _generate_for_categories(
             )
             await db.commit()
             success += 1
-            logger.info(
-                "comment_generated",
-                item_id=str(item.id),
-                category=str(item.category),
-                title=item.title[:60],
-                comment=comment,
-                model=client.model_label,
-            )
+            logger.info("comment_generated",
+                        category=category.value,
+                        title=item.title[:60],
+                        comment=comment,
+                        model=client.model_label)
         else:
-            # API failure likely means quota exhausted — stop this pass
-            logger.warning(
-                "comment_generation_quota_or_error",
-                item_id=str(item.id),
-                model=client.model_label,
-                processed=i,
-                success=success,
-            )
+            # Null response = quota likely exhausted — stop this category
+            logger.warning("comment_quota_or_error",
+                           category=category.value,
+                           model=client.model_label,
+                           processed=i, success=success)
             break
 
         if sleep > 0 and i < len(items) - 1:
             await asyncio.sleep(sleep)
 
-    logger.info(
-        "comment_generation_pass_done",
-        categories=[c.value for c in categories],
-        success=success,
-        total=len(items),
-        model=client.model_label,
-    )
+    logger.info("category_comment_done",
+                category=category.value, success=success, total=len(items))
     return success
