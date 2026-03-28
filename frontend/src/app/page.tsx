@@ -309,10 +309,9 @@ function topicHasRealImg(lead: TopicLeadItem): boolean {
   const t = lead.thumbnail_url;
   if (!t) return false;
   if (t.includes("favicon") || t.includes(".ico")) return false;
-  // GitHub avatars are small profile pics — not suitable as card hero images
   if (t.includes("avatars.githubusercontent.com")) return false;
-  // Reddit/generic site icons are not editorial images
   if (t.includes("redditstatic.com")) return false;
+  if (t.includes("media2.dev.to")) return false;   // white-bg OG images
   return true;
 }
 
@@ -482,9 +481,7 @@ const LATEST_CATEGORIES: { key: string; label: string }[] = [
 
 export default async function HomePage() {
   const topicsData = await fetchTopics(12, 168);
-  const topics = topicsData.topics.filter(
-    (t) => t.lead_item.category !== "github_project"
-  ).slice(0, 6);
+  const topics = topicsData.topics.slice(0, 6);
 
   // Collect IDs already shown in Hot Topics section
   const hotTopicIds = topics.map((t) => t.lead_item.id).join(",");

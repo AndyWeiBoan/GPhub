@@ -169,22 +169,38 @@ def extract_topics(
     results.sort(key=lambda r: (r.count, r.trending_score), reverse=True)
 
     # Categories ranked by "show-ability" as a lead (rich image, visible content)
-    PREFERRED_CATS = ["github_project", "product_launch", "news_article",
-                      "blog_post", "community", "research_paper"]
+    # Categories ranked by visual richness as a lead card.
+    # GitHub projects have small avatar thumbnails — push to last.
+    PREFERRED_CATS = ["product_launch", "news_article", "blog_post",
+                      "community", "research_paper", "github_project"]
 
     # Minimum impact score required to be considered as a lead article.
-    # Items with no engagement signals (impact = 0.0) are deprioritised.
     MIN_LEAD_IMPACT = 0.05
+
+    def _has_rich_thumbnail(item) -> bool:
+        """Mirror the frontend topicHasRealImg logic."""
+        t = item.thumbnail_url
+        if not t:
+            return False
+        if "favicon" in t or ".ico" in t:
+            return False
+        if "avatars.githubusercontent.com" in t:
+            return False
+        if "redditstatic.com" in t:
+            return False
+        if "media2.dev.to" in t:
+            return False
+        return True
 
     def _lead_priority(item) -> tuple:
         cat = str(item.category) if item.category else "research_paper"
         cat_rank = PREFERRED_CATS.index(cat) if cat in PREFERRED_CATS else 99
         ts = scores.get(item.id, 0)
-        has_real_img = bool(item.thumbnail_url and "favicon" not in item.thumbnail_url
-                            and ".ico" not in item.thumbnail_url)
+        has_rich_img = _has_rich_thumbnail(item)
         # Items below the impact threshold are sorted to the back
         has_impact = int((item.impact_score or 0) >= MIN_LEAD_IMPACT)
-        return (-has_impact, cat_rank, -int(has_real_img), -ts)
+        # Priority: impact first, then image quality, then category, then score
+        return (-has_impact, -int(has_rich_img), cat_rank, -ts)
 
     # Re-pick lead per topic using priority
     for r in results:
