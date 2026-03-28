@@ -55,7 +55,10 @@ export default function WeeklyDigestSection({ data }: Props) {
                     >
                       <span className="line-clamp-1 max-w-[180px]">{item.title}</span>
                       {item.ai_comment && (
-                        <span className="hidden sm:inline text-amber-400/60 italic ml-1">— {item.ai_comment}</span>
+                        <span className="hidden sm:inline text-amber-400/60 italic ml-1">
+                          — <span className="not-italic font-semibold text-amber-500/50 text-[9px]">{item.ai_comment_model ?? "AI"}: </span>
+                          {item.ai_comment}
+                        </span>
                       )}
                     </a>
                   ))}

@@ -361,6 +361,7 @@ function TopicMainHero({ topic, rank }: { topic: Topic; rank: number }) {
         )}
         {lead.ai_comment && (
           <p className="text-xs text-amber-400/75 italic mb-3 line-clamp-1">
+            <span className="not-italic font-semibold text-amber-500/60 text-[10px]">{lead.ai_comment_model ?? "AI"} says: </span>
             {lead.ai_comment}
           </p>
         )}
@@ -412,7 +413,10 @@ function TopicSmallCard({ topic, rank }: { topic: Topic; rank: number }) {
           {lead.title}
         </h3>
         {lead.ai_comment && (
-          <p className="mt-1 text-[10px] text-amber-400/70 italic line-clamp-1">{lead.ai_comment}</p>
+          <p className="mt-1 text-[10px] text-amber-400/70 italic line-clamp-1">
+            <span className="not-italic font-semibold text-amber-500/60">{lead.ai_comment_model ?? "AI"}: </span>
+            {lead.ai_comment}
+          </p>
         )}
         {lead.source_name && (
           <p className="mt-1 text-[10px] text-gray-500">{lead.source_name}</p>
@@ -461,7 +465,10 @@ function TopicWideCard({ topic, rank }: { topic: Topic; rank: number }) {
           {lead.title}
         </h3>
         {lead.ai_comment ? (
-          <p className="mt-0.5 text-[11px] text-amber-400/70 italic line-clamp-1">{lead.ai_comment}</p>
+          <p className="mt-0.5 text-[11px] text-amber-400/70 italic line-clamp-1">
+            <span className="not-italic font-semibold text-amber-500/60 text-[10px]">{lead.ai_comment_model ?? "AI"}: </span>
+            {lead.ai_comment}
+          </p>
         ) : desc ? (
           <p className="mt-0.5 text-[11px] text-gray-400 line-clamp-1">{desc}</p>
         ) : null}

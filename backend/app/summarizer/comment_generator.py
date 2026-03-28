@@ -84,7 +84,7 @@ async def _generate_comments(db: AsyncSession, gemini: GeminiClient) -> int:
             await db.execute(
                 update(Item)
                 .where(Item.id == item.id)
-                .values(ai_comment=comment)
+                .values(ai_comment=comment, ai_comment_model=gemini.model_label)
             )
             await db.commit()
             success_count += 1

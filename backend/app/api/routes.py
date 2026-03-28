@@ -55,6 +55,7 @@ class ItemOut(BaseModel):
     total_score: float
     is_summarized: bool
     ai_comment: Optional[str] = None
+    ai_comment_model: Optional[str] = None
 
 
 class ItemListResponse(BaseModel):
@@ -93,6 +94,7 @@ class TrendingItemOut(BaseModel):
     trending_score: float  # computed on-the-fly
     cross_source_count: int
     ai_comment: Optional[str] = None
+    ai_comment_model: Optional[str] = None
 
 
 class CategoryTrend(BaseModel):
@@ -123,6 +125,7 @@ class TopicLeadItem(BaseModel):
     fetched_at: datetime
     trending_score: float
     ai_comment: Optional[str] = None
+    ai_comment_model: Optional[str] = None
 
 
 class TopicOut(BaseModel):
@@ -319,6 +322,7 @@ async def get_topics(
                     fetched_at=lead.fetched_at,
                     trending_score=scores.get(lead.id, 0),
                     ai_comment=lead.ai_comment,
+                    ai_comment_model=lead.ai_comment_model,
                 ),
             )
         )
@@ -708,6 +712,7 @@ class DigestItemOut(BaseModel):
     title: str
     url: str
     ai_comment: Optional[str] = None
+    ai_comment_model: Optional[str] = None
 
 
 class DigestOut(BaseModel):
@@ -761,6 +766,7 @@ async def get_weekly_digest(db: AsyncSession = Depends(get_db)):
                         title=it.title,
                         url=it.url,
                         ai_comment=it.ai_comment,
+                        ai_comment_model=it.ai_comment_model,
                     )
                     for it in items
                 ],

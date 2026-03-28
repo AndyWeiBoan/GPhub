@@ -96,7 +96,8 @@ class Item(Base):
 
     # embedding omitted for SQLite; add pgvector column in a migration when on PostgreSQL
     is_summarized = Column(Boolean, nullable=False, default=False)
-    ai_comment = Column(Text, nullable=True)   # 10-30 char Chinese comment by Gemini
+    ai_comment = Column(Text, nullable=True)         # 10-30 char Chinese comment by AI
+    ai_comment_model = Column(String(100), nullable=True)  # e.g. "Gemini 2.5 Flash"
     created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
     updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
 

@@ -136,6 +136,7 @@ export default function ItemRow({ item, rank, onPreview, onScrollOut, isPreviewi
         </p>
         {item.ai_comment ? (
           <p className="mt-0.5 line-clamp-1 text-xs leading-relaxed text-amber-400/70 italic">
+            <span className="not-italic font-semibold text-amber-500/60 text-[10px]">{item.ai_comment_model ?? "AI"} says: </span>
             {item.ai_comment}
           </p>
         ) : desc ? (

@@ -12,6 +12,15 @@ import structlog
 
 logger = structlog.get_logger(__name__)
 
+# Maps internal model IDs to human-readable display labels
+_MODEL_LABELS: dict[str, str] = {
+    "gemini-2.5-flash":       "Gemini 2.5 Flash",
+    "gemini-2.5-pro":         "Gemini 2.5 Pro",
+    "gemini-1.5-flash":       "Gemini 1.5 Flash",
+    "gemini-1.5-pro":         "Gemini 1.5 Pro",
+    "gemini-2.0-flash":       "Gemini 2.0 Flash",
+}
+
 
 class GeminiClient:
     def __init__(self, api_key: str, model: str = "gemini-2.5-flash"):
@@ -30,6 +39,11 @@ class GeminiClient:
     @property
     def available(self) -> bool:
         return self._client is not None
+
+    @property
+    def model_label(self) -> str:
+        """Human-readable model name for display, e.g. 'Gemini 2.5 Flash'."""
+        return _MODEL_LABELS.get(self.model, self.model)
 
     async def generate_comment(self, title: str, content: str) -> Optional[str]:
         """
