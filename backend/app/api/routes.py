@@ -318,6 +318,7 @@ async def get_topics(
                     published_at=lead.published_at,
                     fetched_at=lead.fetched_at,
                     trending_score=scores.get(lead.id, 0),
+                    ai_comment=lead.ai_comment,
                 ),
             )
         )

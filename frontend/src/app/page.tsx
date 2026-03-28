@@ -359,6 +359,11 @@ function TopicMainHero({ topic, rank }: { topic: Topic; rank: number }) {
             {desc}
           </p>
         )}
+        {lead.ai_comment && (
+          <p className="text-xs text-amber-400/75 italic mb-3 line-clamp-1">
+            {lead.ai_comment}
+          </p>
+        )}
         <span className="flex items-center gap-2">
           <CategoryPill category={lead.category} />
           {lead.source_name && (
@@ -406,6 +411,9 @@ function TopicSmallCard({ topic, rank }: { topic: Topic; rank: number }) {
         <h3 className="text-sm font-bold leading-snug text-white group-hover:text-gray-100 line-clamp-2">
           {lead.title}
         </h3>
+        {lead.ai_comment && (
+          <p className="mt-1 text-[10px] text-amber-400/70 italic line-clamp-1">{lead.ai_comment}</p>
+        )}
         {lead.source_name && (
           <p className="mt-1 text-[10px] text-gray-500">{lead.source_name}</p>
         )}
@@ -452,9 +460,11 @@ function TopicWideCard({ topic, rank }: { topic: Topic; rank: number }) {
         <h3 className="text-sm font-bold leading-snug text-white group-hover:text-gray-100 line-clamp-1">
           {lead.title}
         </h3>
-        {desc && (
+        {lead.ai_comment ? (
+          <p className="mt-0.5 text-[11px] text-amber-400/70 italic line-clamp-1">{lead.ai_comment}</p>
+        ) : desc ? (
           <p className="mt-0.5 text-[11px] text-gray-400 line-clamp-1">{desc}</p>
-        )}
+        ) : null}
       </span>
       <PhotoCredit attribution={lead.thumbnail_attribution} />
     </a>
