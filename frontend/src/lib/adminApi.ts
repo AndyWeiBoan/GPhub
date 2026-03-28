@@ -138,6 +138,9 @@ export const triggerRescore = () =>
 export const triggerComments = () =>
   req<{ job_id: string; message: string }>("/trigger-comments", { method: "POST" });
 
+export const triggerCommentsByCategory = (category: ContentCategory) =>
+  req<{ job_id: string; message: string }>(`/trigger-comments/${category}`, { method: "POST" });
+
 export const triggerDigest = () =>
   req<{ job_id: string; message: string }>("/trigger-digest", { method: "POST" });
 

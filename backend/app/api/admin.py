@@ -410,6 +410,33 @@ async def trigger_comments(background_tasks: BackgroundTasks):
     return {"job_id": job.job_id, "message": "Comment generation triggered"}
 
 
+@router.post("/trigger-comments/{category}")
+async def trigger_comments_by_category(category: str, background_tasks: BackgroundTasks):
+    """Standalone trigger: generate AI comments for a specific category only."""
+    # Validate category
+    valid_cats = {c.value for c in ContentCategory}
+    if category not in valid_cats:
+        raise HTTPException(status_code=422, detail=f"Invalid category: {category}. Valid: {sorted(valid_cats)}")
+
+    job = _new_job(f"Generate AI Comments · {category}", COMMENT_STEPS)
+
+    async def _run():
+        try:
+            _step_start(job, 0)
+            async with AsyncSessionLocal() as db:
+                # Pass no client — let run_comment_generation pick the right
+                # provider per category (Gemini for github_project, fast clients otherwise)
+                n = await run_comment_generation(db=db, only_category=category)
+            _step_done(job, 0, f"{n} 筆")
+            _job_done(job, {"commented": n})
+        except Exception as e:
+            _job_error(job, str(e))
+            log.error("admin_trigger_comments_category_failed", category=category, error=str(e))
+
+    background_tasks.add_task(_run)
+    return {"job_id": job.job_id, "message": f"Comment generation triggered for {category}"}
+
+
 @router.post("/trigger-digest")
 async def trigger_digest(background_tasks: BackgroundTasks):
     """Standalone trigger: regenerate this week's AI digest."""

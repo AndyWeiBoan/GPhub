@@ -1,5 +1,5 @@
-import { fetchTrending, fetchTopics, fetchGithubRising, fetchWeeklyDigest } from "@/lib/api";
-import type { TrendingItem, Topic, TopicLeadItem, GithubRisingItem } from "@/lib/api";
+import { fetchTrending, fetchTopics, fetchWeeklyDigest } from "@/lib/api";
+import type { TrendingItem, Topic, TopicLeadItem } from "@/lib/api";
 import CategoryPill from "@/components/CategoryPill";
 import Thumb from "@/components/Thumb";
 import PhotoCredit from "@/components/PhotoCredit";
@@ -141,7 +141,7 @@ function HeroCard({ item }: { item: TrendingItem }) {
 // ── Medium card (image top, text below) ──────────────────────────────────────
 
 function MediumCard({ item }: { item: TrendingItem }) {
-  const desc     = excerpt(item, 80);
+  const desc     = excerpt(item, 300);
   const realImg  = hasRealImage(item);
   const gradient = CAT_GRADIENT[item.category ?? ""] ?? "from-gray-900 to-[#0f1117]";
   return (
@@ -157,10 +157,10 @@ function MediumCard({ item }: { item: TrendingItem }) {
           <img
             src={item.thumbnail_url!}
             alt=""
-            className="h-24 w-full object-cover transition duration-500 group-hover:scale-[1.03]"
+            className="h-16 w-full object-cover transition duration-500 group-hover:scale-[1.03]"
           />
         ) : (
-          <span className={`flex h-24 w-full items-center justify-center bg-gradient-to-br ${gradient}`}>
+          <span className={`flex h-16 w-full items-center justify-center bg-gradient-to-br ${gradient}`}>
             <span className="text-5xl opacity-40 select-none">
               {CAT_EMOJI[item.category ?? ""] ?? "✦"}
             </span>
@@ -177,12 +177,12 @@ function MediumCard({ item }: { item: TrendingItem }) {
           {item.title}
         </h3>
         {item.ai_comment ? (
-          <p className="line-clamp-2 text-[11px] leading-relaxed text-amber-400/70 italic">
+          <p className="text-[11px] leading-relaxed text-amber-400/70 italic">
             <span className="not-italic font-semibold text-amber-500/60 text-[10px]">{item.ai_comment_model ?? "AI"}: </span>
             {item.ai_comment}
           </p>
         ) : desc ? (
-          <p className="line-clamp-2 text-[11px] leading-relaxed text-gray-500">{desc}</p>
+          <p className="text-[11px] leading-relaxed text-gray-500">{desc}</p>
         ) : null}
         {item.source_name && (
           <p className="mt-auto text-[10px] text-gray-600">{item.source_name}</p>
@@ -250,47 +250,6 @@ function SidebarRow({ item, rank }: { item: TrendingItem; rank: number }) {
           {item.source_name && <span className="text-[11px] text-gray-500">{item.source_name}</span>}
           <span className="text-[11px] text-gray-600">{timeAgo(item.published_at ?? item.fetched_at)}</span>
         </span>
-      </span>
-    </a>
-  );
-}
-
-// ── GitHub Rising row ─────────────────────────────────────────────────────────
-
-function GithubRisingRow({ item, rank }: { item: GithubRisingItem; rank: number }) {
-  const owner = (() => {
-    try { return new URL(item.url).pathname.split("/")[1]; }
-    catch { return ""; }
-  })();
-  return (
-    <a
-      href={item.url}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="group flex items-center gap-3 rounded-xl border border-white/[0.05] bg-white/[0.02] px-3 py-2.5 transition hover:border-white/10 hover:bg-white/[0.04]"
-    >
-      <span className="w-5 flex-shrink-0 text-right text-xs font-black text-gray-700">{rank}</span>
-      {/* Avatar */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={`https://avatars.githubusercontent.com/${owner}?s=40`}
-        alt=""
-        className="h-7 w-7 flex-shrink-0 rounded-lg object-cover"
-      />
-      <span className="min-w-0 flex-1">
-        <span className="block text-sm font-semibold text-gray-100 group-hover:text-white line-clamp-1">
-          {item.title}
-        </span>
-        {item.summary && (
-          <span className="block text-[11px] text-gray-500 line-clamp-1 mt-0.5">{item.summary}</span>
-        )}
-      </span>
-      {/* Star delta badge */}
-      <span className="flex-shrink-0 flex items-center gap-1 rounded-full bg-yellow-500/10 px-2 py-0.5 text-[11px] font-bold text-yellow-400">
-        ★ +{item.star_delta.toLocaleString()}
-      </span>
-      <span className="flex-shrink-0 text-[10px] text-gray-600">
-        {item.github_stars?.toLocaleString()} total
       </span>
     </a>
   );
@@ -367,7 +326,7 @@ function TopicMainHero({ topic, rank }: { topic: Topic; rank: number }) {
           </p>
         )}
         {lead.ai_comment && (
-          <p className="text-xs text-amber-400/75 italic mb-3 line-clamp-1">
+          <p className="text-xs text-amber-400/75 italic mb-3">
             <span className="not-italic font-semibold text-amber-500/60 text-[10px]">{lead.ai_comment_model ?? "AI"} says: </span>
             {lead.ai_comment}
           </p>
@@ -415,7 +374,7 @@ function TopicSmallCard({ topic, rank }: { topic: Topic; rank: number }) {
           {lead.title}
         </h3>
         {lead.ai_comment && (
-          <p className="mt-1 text-[10px] text-amber-400/70 italic line-clamp-1">
+          <p className="mt-1 text-[10px] text-amber-400/70 italic">
             <span className="not-italic font-semibold text-amber-500/60">{lead.ai_comment_model ?? "AI"}: </span>
             {lead.ai_comment}
           </p>
@@ -462,12 +421,12 @@ function TopicWideCard({ topic, rank }: { topic: Topic; rank: number }) {
           {lead.title}
         </h3>
         {lead.ai_comment ? (
-          <p className="mt-0.5 text-[11px] text-amber-400/70 italic line-clamp-1">
+          <p className="mt-0.5 text-[11px] text-amber-400/70 italic">
             <span className="not-italic font-semibold text-amber-500/60 text-[10px]">{lead.ai_comment_model ?? "AI"}: </span>
             {lead.ai_comment}
           </p>
         ) : desc ? (
-          <p className="mt-0.5 text-[11px] text-gray-400 line-clamp-1">{desc}</p>
+          <p className="mt-0.5 text-[11px] text-gray-400">{desc}</p>
         ) : null}
       </span>
       <PhotoCredit attribution={lead.thumbnail_attribution} />
@@ -485,16 +444,18 @@ const LATEST_CATEGORIES: { key: string; label: string }[] = [
 ];
 
 export default async function HomePage() {
-  const topicsData = await fetchTopics(12, 168);
+  // Round 1: fetch topics + above-the-fold trending in parallel
+  const [topicsData, allData] = await Promise.all([
+    fetchTopics(12, 168),
+    fetchTrending(5, 168),
+  ]);
   const topics = topicsData.topics.slice(0, 6);
 
   // Collect IDs already shown in Hot Topics section
   const hotTopicIds = topics.map((t) => t.lead_item.id).join(",");
 
-  // Fetch row-3 MediumCards, per-category, GitHub rising, and weekly digest
-  const [allData, risingData, digestData, ...categoryResults] = await Promise.all([
-    fetchTrending(5, 168),
-    fetchGithubRising(8, 48).catch(() => ({ items: [], window_hours: 48 })),
+  // Round 2: per-category rows + digest (need hotTopicIds from round 1)
+  const [digestData, ...categoryResults] = await Promise.all([
     fetchWeeklyDigest().catch(() => ({ week_label: "", digests: [] })),
     ...LATEST_CATEGORIES.map(({ key }) =>
       fetchTrending(20, 168, { include: key, exclude: hotTopicIds || undefined })
@@ -650,9 +611,7 @@ export default async function HomePage() {
           <div className="space-y-8">
             {LATEST_CATEGORIES.map(({ key, label }, i) => {
               const items = dedupeItems(categoryResults[i]?.items ?? [], 4);
-              const isGithub = key === "github_project";
-              const risingItems = risingData.items;
-              if (items.length === 0 && !(isGithub && risingItems.length > 0)) return null;
+              if (items.length === 0) return null;
               return (
                 <section key={key}>
                   <div className="mb-4 flex items-center justify-between">
@@ -663,25 +622,9 @@ export default async function HomePage() {
                       See all →
                     </a>
                   </div>
-                  {items.length > 0 && (
-                    <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-                      {items.map((item) => <MediumCard key={item.id} item={item} />)}
-                    </div>
-                  )}
-
-                  {/* GitHub Rising — shown below the GitHub latest row */}
-                  {isGithub && risingItems.length > 0 && (
-                    <div className="mt-5">
-                      <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-gray-500">
-                        ⭐ Rising This Week
-                      </p>
-                      <div className="flex flex-col gap-1.5">
-                        {risingItems.map((item, idx) => (
-                          <GithubRisingRow key={item.id} item={item} rank={idx + 1} />
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                  <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                    {items.map((item) => <MediumCard key={item.id} item={item} />)}
+                  </div>
                 </section>
               );
             })}

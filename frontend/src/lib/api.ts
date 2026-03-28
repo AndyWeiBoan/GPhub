@@ -95,7 +95,7 @@ export interface TopicsResponse {
 export async function fetchTopics(top_k = 6, window_hours = 168): Promise<TopicsResponse> {
   const res = await fetch(
     `${API_BASE}/api/v1/topics?top_k=${top_k}&window_hours=${window_hours}`,
-    { cache: "no-store" }
+    { next: { revalidate: 300 } }  // ISR: revalidate every 5 minutes
   );
   if (!res.ok) throw new Error("Failed to fetch topics");
   return res.json();
@@ -152,7 +152,7 @@ export async function fetchTrending(
   url.searchParams.set("window_hours", String(window_hours));
   if (options.exclude) url.searchParams.set("exclude", options.exclude);
   if (options.include) url.searchParams.set("include", options.include);
-  const res = await fetch(url.toString(), { cache: "no-store" });
+  const res = await fetch(url.toString(), { next: { revalidate: 300 } });  // ISR: 5 min
   if (!res.ok) throw new Error("Failed to fetch trending");
   return res.json();
 }
@@ -215,7 +215,7 @@ export interface WeeklyDigestResponse {
 }
 
 export async function fetchWeeklyDigest(): Promise<WeeklyDigestResponse> {
-  const res = await fetch(`${API_BASE}/api/v1/weekly-digest`, { cache: "no-store" });
+  const res = await fetch(`${API_BASE}/api/v1/weekly-digest`, { next: { revalidate: 3600 } });  // ISR: 1 hour
   if (!res.ok) return { week_label: "", digests: [] };
   return res.json();
 }

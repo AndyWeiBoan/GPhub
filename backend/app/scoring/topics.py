@@ -107,17 +107,20 @@ def extract_topics(
     items: Sequence,
     top_k: int = 6,
     min_count: int = 2,
+    scores: dict | None = None,
 ) -> list[TopicResult]:
     """
     Given a list of Item objects, return top_k topic clusters.
     Each item may appear in multiple topics.
     Topics with < min_count items are dropped.
+    Pass pre-computed scores to avoid recomputing them (saves O(n²) work).
     """
     if not items:
         return []
 
-    # Compute trending scores for all items
-    scores = compute_trending_scores(items)
+    # Use provided scores or compute fresh (avoid redundant O(n²) coverage map)
+    if scores is None:
+        scores = compute_trending_scores(items)
 
     # Map each seed → list of (item, trending_score)
     seed_to_items: dict[str, list] = defaultdict(list)

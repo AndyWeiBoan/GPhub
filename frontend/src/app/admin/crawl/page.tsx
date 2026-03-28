@@ -8,6 +8,7 @@ import {
   triggerCrawlCategory,
   triggerRescore,
   triggerComments,
+  triggerCommentsByCategory,
   triggerDigest,
   fetchJob,
   CRAWLER_NAMES,
@@ -297,6 +298,21 @@ export default function CrawlPage() {
             sublabel="重新生成本週 AI 週報摘要 (Gemini)"
             onClick={() => run(triggerDigest)}
           />
+        </div>
+      </section>
+
+      {/* Per-category comments */}
+      <section className="space-y-3">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-500">💬 Comments 依 Category</h2>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {(Object.entries(CATEGORY_LABELS) as [ContentCategory, string][]).map(([cat, label]) => (
+            <ActionButton
+              key={cat}
+              label={`💬 ${label}`}
+              sublabel={`生成 ${cat} 分類的 AI 短評`}
+              onClick={() => run(() => triggerCommentsByCategory(cat))}
+            />
+          ))}
         </div>
       </section>
 

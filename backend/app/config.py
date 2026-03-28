@@ -11,9 +11,11 @@ class Settings(BaseSettings):
     PEXELS_API_KEY: str = ""
 
     # Google Gemini API (https://aistudio.google.com/apikey) — free tier
-    # Free tier: 20 req/day (gemini-2.5-flash) — used for weekly digest only
+    # gemini-2.5-flash: 20 req/day  — used for weekly digest (high quality, low volume)
+    # gemini-2.0-flash: 1500 req/day — used for bulk GitHub comment generation
     GEMINI_API_KEY: str = ""
-    GEMINI_MODEL: str = "gemini-2.5-flash"
+    GEMINI_MODEL: str = "gemini-2.5-flash"          # digest model
+    GEMINI_COMMENT_MODEL: str = "gemini-2.0-flash"  # comment model (higher quota)
 
     # Groq API (https://console.groq.com/keys) — free tier
     # Free tier: 14,400 req/day (llama-3.1-8b-instant)
@@ -56,6 +58,10 @@ class Settings(BaseSettings):
 
     # Scheduler: two runs per day (UTC)
     SCHEDULE_HOURS: list[int] = [6, 18]  # 06:00 and 18:00 UTC
+
+    # Archive: nightly job deletes items older than this many days (03:00 UTC)
+    # GitHub items are kept for ARCHIVE_DAYS * 2 (slower-moving content)
+    ARCHIVE_DAYS: int = 30
 
     # Scoring weights (must sum to 1.0)
     WEIGHT_IMPACT: float = 0.40

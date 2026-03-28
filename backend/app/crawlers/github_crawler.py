@@ -106,10 +106,11 @@ SCHEMA = {
     "name": "GitHub Trending Repos",
     "baseSelector": "article.Box-row",
     "fields": [
-        {"name": "name",        "selector": "h2 a",                        "type": "text"},
-        {"name": "url",         "selector": "h2 a",                        "type": "attribute", "attribute": "href"},
-        {"name": "description", "selector": "p",                           "type": "text"},
-        {"name": "stars",       "selector": "a.Link--muted:first-of-type", "type": "text"},
+        {"name": "name",             "selector": "h2 a",                        "type": "text"},
+        {"name": "url",              "selector": "h2 a",                        "type": "attribute", "attribute": "href"},
+        {"name": "description",      "selector": "p",                           "type": "text"},
+        {"name": "stars",            "selector": "a.Link--muted:first-of-type", "type": "text"},
+        {"name": "stars_this_week",  "selector": "span.d-inline-block",         "type": "text"},
     ],
 }
 
@@ -149,7 +150,7 @@ async def _crawl_language(
     crawler: AsyncWebCrawler,
     language: str,
 ) -> list[dict]:
-    url = f"https://github.com/trending/{language}?since=daily"
+    url = f"https://github.com/trending/{language}?since=weekly"
     strategy = JsonCssExtractionStrategy(SCHEMA, verbose=False)
     config = CrawlerRunConfig(extraction_strategy=strategy)
 
@@ -180,13 +181,16 @@ async def _crawl_language(
         parts = path.split("/")
         owner = parts[0] if len(parts) >= 1 else ""
         repo_name = parts[1] if len(parts) >= 2 else ""
+        # Prefer "X stars this week" over total stars — matches github.com weekly ranking
+        stars_this_week = _parse_stars(repo.get("stars_this_week", ""))
+        stars_total     = _parse_stars(repo.get("stars", ""))
         basic.append({
             "title": clean_name or full_url,
             "url": full_url,
             "owner": owner,
             "repo": repo_name,
             "description": (repo.get("description") or "").strip(),
-            "stars": _parse_stars(repo.get("stars", "")),
+            "stars": stars_this_week if stars_this_week > 0 else stars_total,
             "thumbnail": f"https://avatars.githubusercontent.com/{owner}?s=80",
             "language": language,
         })
@@ -235,7 +239,7 @@ class GitHubCrawler(BaseCrawler):
             subcat_counts[subcat.value] = subcat_counts.get(subcat.value, 0) + 1
 
             # Source name includes language for traceability
-            source_url = f"https://github.com/trending/{repo_info['language']}?since=daily"
+            source_url = f"https://github.com/trending/{repo_info['language']}?since=weekly"
 
             items.append(RawItem(
                 title=repo_info["title"],

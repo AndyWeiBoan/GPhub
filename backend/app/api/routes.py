@@ -305,7 +305,7 @@ async def get_topics(
         return TopicsResponse(topics=[], window_hours=window_hours)
 
     scores = compute_trending_scores(pool)
-    topic_results = extract_topics(pool, top_k=top_k)
+    topic_results = extract_topics(pool, top_k=top_k, scores=scores)  # reuse scores — avoid second O(n²) pass
 
     out = []
     for t in topic_results:
@@ -402,9 +402,8 @@ async def get_trending(
         : max(remaining_slots, 0)
     ]
 
-    # Merge: guaranteed first (sorted by score), then extras
-    guaranteed.sort(key=lambda x: scores.get(x.id, 0), reverse=True)
-    ranked = (guaranteed + extras)[:top_n]
+    # Merge and re-sort by trending score so final order is strictly high → low
+    ranked = sorted(guaranteed + extras, key=lambda x: scores.get(x.id, 0), reverse=True)[:top_n]
 
     out_items = [
         TrendingItemOut(
@@ -419,28 +418,19 @@ async def get_trending(
         for item in ranked
     ]
 
-    # Category trends
+    # Category trends — derived from the already-loaded pool (no extra DB queries)
     cutoff_24h = datetime.now(timezone.utc) - timedelta(hours=24)
-    cat_7d_rows = await db.execute(
-        select(Item.category, func.count(Item.id))
-        .where((Item.published_at >= cutoff) | (Item.fetched_at >= cutoff))
-        .group_by(Item.category)
-    )
-    cat_24h_rows = await db.execute(
-        select(Item.category, func.count(Item.id))
-        .where((Item.published_at >= cutoff_24h) | (Item.fetched_at >= cutoff_24h))
-        .group_by(Item.category)
-    )
-    total_7d_count = (
-        await db.execute(
-            select(func.count(Item.id)).where(
-                (Item.published_at >= cutoff) | (Item.fetched_at >= cutoff)
-            )
-        )
-    ).scalar_one() or 1
+    map_7d: dict = {}
+    map_24h: dict = {}
+    for item in pool:
+        ref = item.published_at or item.fetched_at
+        cat = item.category
+        if cat:
+            map_7d[cat] = map_7d.get(cat, 0) + 1
+            if ref and ref >= cutoff_24h:
+                map_24h[cat] = map_24h.get(cat, 0) + 1
 
-    map_7d = {row[0]: row[1] for row in cat_7d_rows.all()}
-    map_24h = {row[0]: row[1] for row in cat_24h_rows.all()}
+    total_7d_count = len(pool) or 1
 
     category_trends = [
         CategoryTrend(

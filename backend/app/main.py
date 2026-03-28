@@ -170,12 +170,25 @@ DEFAULT_SOURCES = [
 
 
 async def _init_db():
-    """Create all tables and seed default sources if not present."""
+    """Create all tables, ensure performance indexes, and seed default sources if not present."""
     from app.models import Source, SourceTier, ContentCategory
     import uuid
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+        # Performance indexes — idempotent, safe to re-run
+        _indexes = [
+            "CREATE INDEX IF NOT EXISTS idx_items_category_score ON items (category, total_score DESC)",
+            "CREATE INDEX IF NOT EXISTS idx_items_fetched_category ON items (fetched_at DESC, category)",
+            "CREATE INDEX IF NOT EXISTS idx_items_published_category ON items (published_at DESC, category)",
+            "CREATE INDEX IF NOT EXISTS idx_items_fetched_at_asc ON items (fetched_at ASC)",
+        ]
+        for ddl in _indexes:
+            try:
+                await conn.execute(text(ddl))
+            except Exception:
+                pass  # index may not support partial syntax on older SQLite — skip gracefully
 
     async with AsyncSessionLocal() as db:
         for name, url, tier, category in DEFAULT_SOURCES:

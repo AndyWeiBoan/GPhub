@@ -1,14 +1,18 @@
 """
-APScheduler jobs — two crawl+summarise runs per day.
-Fires at 06:00 UTC and 18:00 UTC by default (configurable via SCHEDULE_HOURS).
+APScheduler jobs — two crawl+summarise runs per day + nightly archive.
+Crawl fires at 06:00 UTC and 18:00 UTC (configurable via SCHEDULE_HOURS).
+Archive fires at 03:00 UTC daily — deletes items older than ARCHIVE_DAYS.
 """
 import asyncio
 import structlog
+from datetime import datetime, timezone, timedelta
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
+from sqlalchemy import delete
 
 from app.config import settings
 from app.database import AsyncSessionLocal
+from app.models import Item
 from app.crawlers.manager import run_crawl
 from app.crawlers.og_fetcher import enrich_thumbnails
 from app.crawlers.pexels_fetcher import enrich_with_pexels
@@ -89,6 +93,43 @@ async def crawl_and_summarise():
         log.info("gemini_skipped", reason="GEMINI_API_KEY not set")
 
 
+async def archive_old_items():
+    """
+    Nightly archive job — runs at 03:00 UTC.
+    Deletes items (and their cascaded star_snapshots) older than ARCHIVE_DAYS.
+    GitHub projects are kept for ARCHIVE_DAYS * 2 since they're slower-moving.
+    """
+    archive_days = getattr(settings, "ARCHIVE_DAYS", 30)
+    cutoff_default = datetime.now(timezone.utc) - timedelta(days=archive_days)
+    cutoff_github  = datetime.now(timezone.utc) - timedelta(days=archive_days * 2)
+
+    async with AsyncSessionLocal() as db:
+        # Delete non-github items older than archive_days
+        result_non_gh = await db.execute(
+            delete(Item).where(
+                Item.fetched_at < cutoff_default,
+                Item.category != "github_project",
+            )
+        )
+        # Delete github items older than archive_days * 2
+        result_gh = await db.execute(
+            delete(Item).where(
+                Item.fetched_at < cutoff_github,
+                Item.category == "github_project",
+            )
+        )
+        await db.commit()
+
+    deleted = result_non_gh.rowcount + result_gh.rowcount
+    log.info(
+        "archive_done",
+        deleted_non_github=result_non_gh.rowcount,
+        deleted_github=result_gh.rowcount,
+        total=deleted,
+        cutoff_days=archive_days,
+    )
+
+
 def create_scheduler() -> AsyncIOScheduler:
     scheduler = AsyncIOScheduler(timezone="UTC")
 
@@ -102,6 +143,15 @@ def create_scheduler() -> AsyncIOScheduler:
         replace_existing=True,
         max_instances=1,
         misfire_grace_time=300,
+    )
+
+    scheduler.add_job(
+        archive_old_items,
+        trigger=CronTrigger(hour=3, minute=0),  # 03:00 UTC daily
+        id="archive_old_items",
+        replace_existing=True,
+        max_instances=1,
+        misfire_grace_time=600,
     )
 
     log.info("scheduler_created", hours=hours)

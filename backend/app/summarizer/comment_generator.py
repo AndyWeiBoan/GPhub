@@ -121,7 +121,10 @@ def _build_gemini_client() -> Optional[CommentClient]:
         return None
     try:
         from app.summarizer.gemini import GeminiClient
-        client = GeminiClient(api_key=settings.GEMINI_API_KEY, model=settings.GEMINI_MODEL)
+        # Use the high-quota comment model (gemini-2.0-flash, 1500 req/day)
+        # rather than the digest model (gemini-2.5-flash, 20 req/day)
+        model = settings.GEMINI_COMMENT_MODEL
+        client = GeminiClient(api_key=settings.GEMINI_API_KEY, model=model)
         if client.available:
             return client
     except Exception as e:
@@ -147,11 +150,13 @@ async def run_comment_generation(
     db: Optional[AsyncSession] = None,
     client: Optional[CommentClient] = None,
     gemini=None,  # legacy kwarg
+    only_category: Optional[str] = None,
 ) -> int:
     """
     Generate comments in parallel across all available providers.
     Items are ranked by total_score DESC so trending topic leads
     always get commented first.
+    Pass only_category to restrict generation to a single ContentCategory value.
     Returns total items successfully commented.
     """
     if client is None and gemini is not None:
@@ -178,7 +183,7 @@ async def run_comment_generation(
 
         # ── Fetch top uncommented non-github items by score ───────────────────
         fast_cat_values = [c.value for c in FAST_CATEGORIES]
-        result = await db.execute(
+        fast_q = (
             select(Item)
             .where(
                 Item.ai_comment == None,  # noqa: E711
@@ -187,10 +192,28 @@ async def run_comment_generation(
             .order_by(Item.total_score.desc())
             .limit(FAST_TOTAL_LIMIT)
         )
-        all_items = [
-            item for item in result.scalars().all()
-            if not (item.category == ContentCategory.blog_post.value and _is_paywalled(item))
-        ]
+        # When only_category is set, restrict to that category (skip github — handled below)
+        if only_category and only_category in fast_cat_values:
+            fast_q = (
+                select(Item)
+                .where(
+                    Item.ai_comment == None,  # noqa: E711
+                    Item.category == only_category,
+                )
+                .order_by(Item.total_score.desc())
+                .limit(FAST_TOTAL_LIMIT)
+            )
+        elif only_category and only_category not in fast_cat_values:
+            # It's a gemini category (github_project) — skip fast path entirely
+            fast_q = None
+
+        all_items: list[Item] = []
+        if fast_q is not None:
+            result = await db.execute(fast_q)
+            all_items = [
+                item for item in result.scalars().all()
+                if not (item.category == ContentCategory.blog_post.value and _is_paywalled(item))
+            ]
 
         if all_items and fast_clients:
             # Split items round-robin across available fast clients
@@ -217,8 +240,11 @@ async def run_comment_generation(
             )
             total += sum(results)
 
-        # ── GitHub via Gemini ─────────────────────────────────────────────────
-        if gemini_client:
+        # ── GitHub via Gemini (fallback to fast client if Gemini unavailable) ──
+        # Skip if only_category is set to a non-github category
+        run_github = only_category is None or only_category == ContentCategory.github_project.value
+        github_client = gemini_client or (fast_clients[0] if fast_clients else None)
+        if github_client and run_github:
             github_result = await db.execute(
                 select(Item)
                 .where(
@@ -230,10 +256,16 @@ async def run_comment_generation(
             )
             github_items = github_result.scalars().all()
             if github_items:
-                n = await _process_items(db, gemini_client, list(github_items), _GEMINI_SLEEP)
+                sleep = _GEMINI_SLEEP if github_client is gemini_client else _FAST_SLEEP
+                n = await _process_items(db, github_client, list(github_items), sleep)
                 total += n
-        else:
-            logger.info("github_comments_skipped", reason="no GEMINI_API_KEY")
+                # If Gemini quota exhausted (n=0) and we have a fast fallback, retry with it
+                if n == 0 and github_client is gemini_client and fast_clients:
+                    logger.info("github_gemini_quota_exhausted_falling_back_to_fast_client")
+                    n = await _process_items(db, fast_clients[0], list(github_items), _FAST_SLEEP)
+                    total += n
+        elif not github_client:
+            logger.info("github_comments_skipped", reason="no LLM client available")
 
         logger.info("comment_generation_total", total=total)
         return total
@@ -248,15 +280,36 @@ async def _process_items(
     client: CommentClient,
     items: list[Item],
     sleep: float,
+    max_retries: int = 2,
 ) -> int:
-    """Process a list of items with one client, stop on quota exhaustion."""
+    """Process a list of items with one client.
+
+    Retries up to max_retries times on transient errors (rate-limit 429).
+    Stops the run only on hard quota exhaustion (daily limit exceeded).
+    """
     if not items:
         return 0
+
+    _RETRY_SLEEP = 12.0   # seconds to wait after a 429 before retrying
 
     success = 0
     for i, item in enumerate(items):
         content = item.summary or item.raw_content or ""
-        comment = await client.generate_comment(item.title, content)
+        category = str(item.category.value if hasattr(item.category, "value") else item.category or "")
+
+        comment = None
+        for attempt in range(max_retries + 1):
+            comment = await client.generate_comment(item.title, content, category)
+            if comment is not None:
+                break
+            if attempt < max_retries:
+                logger.warning(
+                    "comment_retry",
+                    model=client.model_label,
+                    attempt=attempt + 1,
+                    title=item.title[:50],
+                )
+                await asyncio.sleep(_RETRY_SLEEP)
 
         if comment:
             await db.execute(
@@ -275,7 +328,7 @@ async def _process_items(
             )
         else:
             logger.warning(
-                "comment_quota_or_error",
+                "comment_quota_exhausted",
                 model=client.model_label,
                 processed=i,
                 success=success,

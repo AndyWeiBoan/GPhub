@@ -96,8 +96,39 @@ NEXT_PUBLIC_API_URL=http://localhost:8000 npm run dev
 
 ## Scheduler
 
-Crawls run at **06:00 UTC** and **18:00 UTC** by default.
-Change via `SCHEDULE_HOURS` in `backend/app/config.py`.
+| Job | Schedule (UTC) | Description |
+|---|---|---|
+| `crawl_and_summarise` | 06:00 and 18:00 | Full pipeline: crawl → score → thumbnail → comment → digest |
+| `archive_old_items` | 03:00 daily | Delete stale items to keep the DB lean (see Archive below) |
+
+Change crawl hours via `SCHEDULE_HOURS` in `.env` or `backend/app/config.py`.
+
+## Archive Strategy
+
+The `items` table grows continuously with every crawl. To prevent unbounded growth and keep feed queries fast, a nightly archive job runs at **03:00 UTC** and hard-deletes rows past their retention window.
+
+| Content type | Retention | Rationale |
+|---|---|---|
+| All non-GitHub categories | **30 days** (`ARCHIVE_DAYS`) | News, papers, blog posts lose relevance quickly |
+| `github_project` | **60 days** (`ARCHIVE_DAYS × 2`) | Repos are slower-moving; star history is preserved longer |
+
+`star_snapshots` rows are cascade-deleted automatically via the FK `ON DELETE CASCADE`.
+
+**Configuration** — override the default in `.env`:
+
+```env
+ARCHIVE_DAYS=30   # non-github retention in days (github = 2×)
+```
+
+**At typical crawl volume** (~70 new items/day, 2 runs × ~35 items):
+
+| Days of data | Approx. rows | Feed query time |
+|---|---|---|
+| 7 days | ~490 | < 50 ms |
+| 30 days | ~2,100 | ~100 ms |
+| Unbounded (no archive) | 25,000+/year | degrades linearly |
+
+The archive job deletes `github_project` items separately with a 2× longer window so trending repos stay discoverable even if they weren't crawled every day.
 
 ## Frontend Layout
 
@@ -148,13 +179,6 @@ Change via `SCHEDULE_HOURS` in `backend/app/config.py`.
   ┌──────────┬──────────┬──────────┬──────────┐
   │ MedCard  │ MedCard  │ MedCard  │ MedCard  │
   └──────────┴──────────┴──────────┴──────────┘
-
-  ⭐ RISING THIS WEEK  (GitHub star velocity, past 48h)
-  ┌──────────────────────────────────────────────────┐
-  │ #1  repo/name  ████████  +1,234 stars  (+42%)   │
-  │ #2  repo/name  ██████    +890 stars    (+31%)   │
-  │ ...  (up to 8 items)                            │
-  └──────────────────────────────────────────────────┘
 
 ━━━━━━━━━━━━━━━━━━  LATEST · PRODUCTS  (top 4 by score)  ━━━━━━━━━━━━━
   ┌──────────┬──────────┬──────────┬──────────┐
@@ -214,7 +238,7 @@ blog_post      →  Cerebras / Groq     14,400 req  (paywall items skipped)
 research_paper →  Cerebras / Groq     14,400 req
 product_launch →  Cerebras / Groq     14,400 req
 community      →  Cerebras / Groq     14,400 req
-github_project →  Gemini 2.5 Flash        20 req  (skip if quota gone)
+github_project →  Gemini 2.0 Flash      1500 req  (falls back to Cerebras/Groq if quota gone)
 
 Top 60 items per category per crawl run.
 Already-commented items are never re-processed.
