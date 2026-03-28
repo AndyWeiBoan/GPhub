@@ -14,9 +14,9 @@ import structlog
 logger = structlog.get_logger(__name__)
 
 _MODEL_LABELS: dict[str, str] = {
-    "llama-3.1-8b":   "Llama 3.1 8B",
-    "llama-3.3-70b":  "Llama 3.3 70B",
-    "gpt-oss-120b":   "GPT OSS 120B",
+    "llama-3.1-8b":   "Cerebras Llama 3.1 8B",
+    "llama-3.3-70b":  "Cerebras Llama 3.3 70B",
+    "gpt-oss-120b":   "Cerebras GPT OSS 120B",
 }
 
 

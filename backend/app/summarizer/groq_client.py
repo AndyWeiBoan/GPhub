@@ -15,11 +15,11 @@ import structlog
 logger = structlog.get_logger(__name__)
 
 _MODEL_LABELS: dict[str, str] = {
-    "llama-3.1-8b-instant":              "Llama 3.1 8B",
-    "llama-3.3-70b-versatile":           "Llama 3.3 70B",
-    "meta-llama/llama-4-scout-17b-16e-instruct": "Llama 4 Scout",
-    "moonshotai/kimi-k2-instruct":       "Kimi K2",
-    "qwen/qwen3-32b":                    "Qwen3 32B",
+    "llama-3.1-8b-instant":              "Groq Llama 3.1 8B",
+    "llama-3.3-70b-versatile":           "Groq Llama 3.3 70B",
+    "meta-llama/llama-4-scout-17b-16e-instruct": "Groq Llama 4 Scout",
+    "moonshotai/kimi-k2-instruct":       "Groq Kimi K2",
+    "qwen/qwen3-32b":                    "Groq Qwen3 32B",
 }
 
 
