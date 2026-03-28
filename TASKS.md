@@ -343,7 +343,8 @@ curl http://localhost:8000/api/weekly-digest | python -m json.tool
 
 ## 注意事項
 
-- Gemini free tier 限制：15 requests/min，1500 requests/day
-- 每次 comment 生成間隔 4 秒（保守估計）
+- Gemini free tier 限制（gemini-2.5-flash）：20 requests/day（實測確認）
+- 每次 comment/digest 生成間隔 2 秒（實際每次呼叫約 8-10 秒，不需要額外等太久）
+- GEMINI_COMMENT_BATCH_SIZE 預設 50，但 free tier 每日 20 次，實務上每次 crawl 最多能跑 15-18 筆
 - 短評內容不可重複標題，要有獨到觀點
 - 所有 AI 生成內容都是**可選的**（nullable），系統不依賴它運作

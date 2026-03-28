@@ -134,11 +134,15 @@ export default function ItemRow({ item, rank, onPreview, onScrollOut, isPreviewi
         <p className="text-sm font-semibold leading-snug text-gray-100 group-hover:text-white line-clamp-1">
           {item.title}
         </p>
-        {desc && (
+        {item.ai_comment ? (
+          <p className="mt-0.5 line-clamp-1 text-xs leading-relaxed text-amber-400/70 italic">
+            {item.ai_comment}
+          </p>
+        ) : desc ? (
           <p className="mt-0.5 line-clamp-1 text-xs leading-relaxed text-gray-500">
             {desc}
           </p>
-        )}
+        ) : null}
       </a>
 
       {/* Score */}

@@ -30,6 +30,7 @@ export interface Item {
   novelty_score: number;
   total_score: number;
   is_summarized: boolean;
+  ai_comment: string | null;
 }
 
 export interface ItemListResponse {
@@ -75,6 +76,32 @@ export interface TopicLeadItem {
   published_at: string | null;
   fetched_at: string;
   trending_score: number;
+  ai_comment: string | null;
+}
+
+export interface DigestItem {
+  id: string;
+  title: string;
+  url: string;
+  ai_comment: string | null;
+}
+
+export interface Digest {
+  title: string;
+  analysis: string;
+  item_ids: string[];
+  items: DigestItem[];
+}
+
+export interface WeeklyDigestResponse {
+  week_label: string;
+  digests: Digest[];
+}
+
+export async function fetchWeeklyDigest(): Promise<WeeklyDigestResponse> {
+  const res = await fetch(`${API_BASE}/api/v1/weekly-digest`, { cache: "no-store" });
+  if (!res.ok) return { week_label: "", digests: [] };
+  return res.json();
 }
 
 export interface Topic {

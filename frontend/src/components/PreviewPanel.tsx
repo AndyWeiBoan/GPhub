@@ -232,6 +232,14 @@ export default function PreviewPanel({ item, onClose, onPrev, onNext, hasPrev, h
           </div>
         )}
 
+        {/* AI Comment */}
+        {item.ai_comment && (
+          <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2.5">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-amber-500/60 mb-1">AI 短評</p>
+            <p className="text-sm leading-relaxed text-amber-300/80 italic">{item.ai_comment}</p>
+          </div>
+        )}
+
         {/* Summary */}
         {item.summary && (
           <div className="space-y-1.5">

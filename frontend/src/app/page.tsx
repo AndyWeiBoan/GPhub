@@ -1,8 +1,9 @@
-import { fetchTrending, fetchTopics, fetchGithubRising } from "@/lib/api";
+import { fetchTrending, fetchTopics, fetchGithubRising, fetchWeeklyDigest } from "@/lib/api";
 import type { TrendingItem, Topic, TopicLeadItem, GithubRisingItem } from "@/lib/api";
 import CategoryPill from "@/components/CategoryPill";
 import Thumb from "@/components/Thumb";
 import PhotoCredit from "@/components/PhotoCredit";
+import WeeklyDigestSection from "@/components/WeeklyDigestSection";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -478,10 +479,11 @@ export default async function HomePage() {
   // Collect IDs already shown in Hot Topics section
   const hotTopicIds = topics.map((t) => t.lead_item.id).join(",");
 
-  // Fetch row-3 MediumCards, per-category, and GitHub rising
-  const [allData, risingData, ...categoryResults] = await Promise.all([
+  // Fetch row-3 MediumCards, per-category, GitHub rising, and weekly digest
+  const [allData, risingData, digestData, ...categoryResults] = await Promise.all([
     fetchTrending(5, 168),
     fetchGithubRising(8, 48).catch(() => ({ items: [], window_hours: 48 })),
+    fetchWeeklyDigest().catch(() => ({ week_label: "", digests: [] })),
     ...LATEST_CATEGORIES.map(({ key }) =>
       fetchTrending(20, 168, { include: key, exclude: hotTopicIds || undefined })
     ),
@@ -533,6 +535,11 @@ export default async function HomePage() {
         </div>
         <a href="/browse" className="text-xs text-gray-500 transition hover:text-white">Browse all →</a>
       </div>
+
+      {/* ── Weekly AI Digest ── */}
+      {digestData.digests.length > 0 && (
+        <WeeklyDigestSection data={digestData} />
+      )}
 
       {topics.length === 0 ? (
         <div className="rounded-2xl border border-white/[0.06] py-24 text-center">

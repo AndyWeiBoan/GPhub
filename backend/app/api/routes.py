@@ -20,6 +20,7 @@ from app.models import (
     ContentCategory,
     GithubSubcat,
     StarSnapshot,
+    WeeklyDigest,
 )
 from app.crawlers.manager import run_crawl
 from app.summarizer.claude import summarise_pending
@@ -53,6 +54,7 @@ class ItemOut(BaseModel):
     novelty_score: float
     total_score: float
     is_summarized: bool
+    ai_comment: Optional[str] = None
 
 
 class ItemListResponse(BaseModel):
@@ -90,6 +92,7 @@ class TrendingItemOut(BaseModel):
     total_score: float
     trending_score: float  # computed on-the-fly
     cross_source_count: int
+    ai_comment: Optional[str] = None
 
 
 class CategoryTrend(BaseModel):
@@ -119,6 +122,7 @@ class TopicLeadItem(BaseModel):
     published_at: Optional[datetime]
     fetched_at: datetime
     trending_score: float
+    ai_comment: Optional[str] = None
 
 
 class TopicOut(BaseModel):
@@ -696,6 +700,73 @@ async def backfill_star_snapshots(background_tasks: BackgroundTasks):
 
     background_tasks.add_task(_run)
     return {"message": "Star snapshot backfill triggered in background"}
+
+
+class DigestItemOut(BaseModel):
+    id: str
+    title: str
+    url: str
+    ai_comment: Optional[str] = None
+
+
+class DigestOut(BaseModel):
+    title: str
+    analysis: str
+    item_ids: list[str]
+    items: list[DigestItemOut]
+
+
+class WeeklyDigestResponse(BaseModel):
+    week_label: str
+    digests: list[DigestOut]
+
+
+@router.get("/weekly-digest", response_model=WeeklyDigestResponse)
+async def get_weekly_digest(db: AsyncSession = Depends(get_db)):
+    """Return this week's AI-generated hot topic digest with linked items."""
+    import json
+    from app.summarizer.digest_generator import _week_label
+
+    week = _week_label()
+
+    result = await db.execute(
+        select(WeeklyDigest)
+        .where(WeeklyDigest.week_label == week)
+        .order_by(WeeklyDigest.created_at.asc())
+    )
+    digests = result.scalars().all()
+
+    out: list[DigestOut] = []
+    for digest in digests:
+        try:
+            item_ids = json.loads(digest.item_ids)
+        except Exception:
+            item_ids = []
+
+        # Fetch linked items
+        items_result = await db.execute(
+            select(Item).where(Item.id.in_(item_ids)).limit(5)
+        )
+        items = items_result.scalars().all()
+
+        out.append(
+            DigestOut(
+                title=digest.title,
+                analysis=digest.analysis,
+                item_ids=item_ids,
+                items=[
+                    DigestItemOut(
+                        id=str(it.id),
+                        title=it.title,
+                        url=it.url,
+                        ai_comment=it.ai_comment,
+                    )
+                    for it in items
+                ],
+            )
+        )
+
+    return WeeklyDigestResponse(week_label=week, digests=out)
 
 
 @router.post("/trigger-rescore")

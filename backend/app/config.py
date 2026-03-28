@@ -10,6 +10,13 @@ class Settings(BaseSettings):
     ANTHROPIC_API_KEY: str = ""
     PEXELS_API_KEY: str = ""
 
+    # Google Gemini API (https://aistudio.google.com/apikey) — free tier
+    # Free tier: 15 req/min, 1500 req/day (gemini-2.5-flash)
+    GEMINI_API_KEY: str = ""
+    GEMINI_MODEL: str = "gemini-2.5-flash"
+    # Batch size for comment generation per crawl run
+    GEMINI_COMMENT_BATCH_SIZE: int = 50
+
     # NewsAPI (https://newsapi.org/) — free tier: 100 req/day
     NEWS_API_KEY: str = ""
     # Max articles per query (free tier caps at 100 per request)

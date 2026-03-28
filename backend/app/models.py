@@ -96,6 +96,7 @@ class Item(Base):
 
     # embedding omitted for SQLite; add pgvector column in a migration when on PostgreSQL
     is_summarized = Column(Boolean, nullable=False, default=False)
+    ai_comment = Column(Text, nullable=True)   # 10-30 char Chinese comment by Gemini
     created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
     updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -112,6 +113,18 @@ class StarSnapshot(Base):
     )
     stars = Column(Integer, nullable=False)
     recorded_at = Column(DateTime(timezone=True), default=datetime.utcnow, nullable=False)
+
+
+class WeeklyDigest(Base):
+    """AI-generated weekly hot-topic digest. One row per topic cluster per week."""
+    __tablename__ = "weekly_digests"
+
+    id = _uuid_col(primary_key=True)
+    week_label = Column(String(10), nullable=False)   # e.g. "2026-W13"
+    title = Column(Text, nullable=False)              # hot topic title
+    analysis = Column(Text, nullable=False)           # 100-200 char Gemini analysis
+    item_ids = Column(Text, nullable=False)           # JSON array of item UUIDs
+    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
 
 
 class CrawlRun(Base):

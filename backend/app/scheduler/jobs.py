@@ -13,12 +13,15 @@ from app.crawlers.manager import run_crawl
 from app.crawlers.og_fetcher import enrich_thumbnails
 from app.crawlers.pexels_fetcher import enrich_with_pexels
 from app.summarizer.claude import summarise_pending
+from app.summarizer.comment_generator import run_comment_generation
+from app.summarizer.digest_generator import run_digest_generation
+from app.summarizer.gemini import GeminiClient
 
 log = structlog.get_logger()
 
 
 async def crawl_and_summarise():
-    """Full pipeline: crawl → score → enrich OG images → summarise."""
+    """Full pipeline: crawl → score → enrich OG → pexels → Claude summary → Gemini comments → Gemini digest."""
     log.info("scheduled_job_start")
     async with AsyncSessionLocal() as db:
         crawl_result = await run_crawl(db)
@@ -36,6 +39,22 @@ async def crawl_and_summarise():
     async with AsyncSessionLocal() as db:
         summarised = await summarise_pending(db)
         log.info("summarise_done", count=summarised)
+
+    # Gemini AI comments and weekly digest (graceful skip if no API key)
+    if settings.GEMINI_API_KEY:
+        gemini = GeminiClient(
+            api_key=settings.GEMINI_API_KEY,
+            model=settings.GEMINI_MODEL,
+        )
+        async with AsyncSessionLocal() as db:
+            commented = await run_comment_generation(db=db, gemini=gemini)
+            log.info("gemini_comments_done", count=commented)
+
+        async with AsyncSessionLocal() as db:
+            digested = await run_digest_generation(db=db, gemini=gemini)
+            log.info("gemini_digest_done", count=digested)
+    else:
+        log.info("gemini_skipped", reason="GEMINI_API_KEY not set")
 
 
 def create_scheduler() -> AsyncIOScheduler:

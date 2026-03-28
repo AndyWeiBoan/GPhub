@@ -16,6 +16,9 @@ from app.crawlers.manager import run_crawl, CRAWLER_MAP, ALL_CRAWLERS
 from app.crawlers.og_fetcher import enrich_thumbnails
 from app.crawlers.pexels_fetcher import enrich_with_pexels
 from app.summarizer.claude import summarise_pending
+from app.summarizer.comment_generator import run_comment_generation
+from app.summarizer.digest_generator import run_digest_generation
+from app.summarizer.gemini import GeminiClient
 from app.scoring.engine import score_item
 
 log = structlog.get_logger()
@@ -164,7 +167,9 @@ FULL_CRAWL_STEPS = [
     "爬蟲 (RSS + GitHub + Anthropic)",
     "OG 圖片補全",
     "Pexels 圖片",
-    "AI 摘要",
+    "AI 摘要 (Claude)",
+    "AI 短評 (Gemini)",
+    "週報摘要 (Gemini)",
 ]
 SINGLE_CRAWL_STEPS = ["爬蟲", "OG 圖片補全"]
 RESCORE_STEPS = ["重新評分"]
@@ -194,11 +199,31 @@ async def trigger_crawl_all(background_tasks: BackgroundTasks):
                 n = await enrich_with_pexels(db)
             _step_done(job, 2, f"Pexels {n} 張")
 
-            # Step 3: summarise
+            # Step 3: Claude summarise
             _step_start(job, 3)
             async with AsyncSessionLocal() as db:
                 n = await summarise_pending(db)
             _step_done(job, 3, f"摘要 {n} 筆")
+
+            # Step 4 & 5: Gemini comments + digest (graceful skip if no key)
+            from app.config import settings as _settings
+            if _settings.GEMINI_API_KEY:
+                gemini = GeminiClient(
+                    api_key=_settings.GEMINI_API_KEY,
+                    model=_settings.GEMINI_MODEL,
+                )
+                _step_start(job, 4)
+                async with AsyncSessionLocal() as db:
+                    nc = await run_comment_generation(db=db, gemini=gemini)
+                _step_done(job, 4, f"短評 {nc} 筆")
+
+                _step_start(job, 5)
+                async with AsyncSessionLocal() as db:
+                    nd = await run_digest_generation(db=db, gemini=gemini)
+                _step_done(job, 5, f"週報 {nd} 則")
+            else:
+                _step_done(job, 4, "跳過 (無 GEMINI_API_KEY)")
+                _step_done(job, 5, "跳過 (無 GEMINI_API_KEY)")
 
             _job_done(job, {"fetched": r["fetched"], "new": r["new"]})
         except Exception as e:
