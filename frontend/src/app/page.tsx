@@ -305,7 +305,14 @@ function topicDesc(lead: TopicLeadItem, maxLen = 160): string {
 }
 
 function topicHasRealImg(lead: TopicLeadItem): boolean {
-  return !!(lead.thumbnail_url && !lead.thumbnail_url.includes("favicon") && !lead.thumbnail_url.includes(".ico"));
+  const t = lead.thumbnail_url;
+  if (!t) return false;
+  if (t.includes("favicon") || t.includes(".ico")) return false;
+  // GitHub avatars are small profile pics — not suitable as card hero images
+  if (t.includes("avatars.githubusercontent.com")) return false;
+  // Reddit/generic site icons are not editorial images
+  if (t.includes("redditstatic.com")) return false;
+  return true;
 }
 
 // ── #1 大 Hero（左半，全高，大圖＋疊加文字）────────────────────────────────────
