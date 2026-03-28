@@ -278,19 +278,25 @@ async def get_topics(
     ),
     db: AsyncSession = Depends(get_db),
 ):
-    """Return top trending AI topics with a lead article per topic."""
+    """Return top trending AI topics with a lead article per topic.
+
+    GitHub projects are always excluded — they have a dedicated GitHub Rising
+    section on the frontend and don't belong in editorial Trending Topics.
+    """
     from app.scoring.topics import extract_topics
     from app.scoring.trending import compute_trending_scores
 
     cutoff = datetime.now(timezone.utc) - timedelta(hours=window_hours)
-    stmt = select(Item).where(
-        (Item.published_at >= cutoff) | (Item.fetched_at >= cutoff)
-    )
 
+    # Always exclude github_project; also honour any caller-supplied excludes
+    excluded_cats = {"github_project"}
     if exclude:
-        cats = [c.strip() for c in exclude.split(",") if c.strip()]
-        if cats:
-            stmt = stmt.where(Item.category.notin_(cats))
+        excluded_cats.update(c.strip() for c in exclude.split(",") if c.strip())
+
+    stmt = select(Item).where(
+        (Item.published_at >= cutoff) | (Item.fetched_at >= cutoff),
+        Item.category.notin_(excluded_cats),
+    )
 
     rows = await db.execute(stmt)
     pool = rows.scalars().all()
