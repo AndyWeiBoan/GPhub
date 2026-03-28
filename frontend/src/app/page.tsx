@@ -176,9 +176,14 @@ function MediumCard({ item }: { item: TrendingItem }) {
         <h3 className="line-clamp-2 text-sm font-bold leading-snug text-gray-100 group-hover:text-white">
           {item.title}
         </h3>
-        {desc && (
+        {item.ai_comment ? (
+          <p className="line-clamp-2 text-[11px] leading-relaxed text-amber-400/70 italic">
+            <span className="not-italic font-semibold text-amber-500/60 text-[10px]">{item.ai_comment_model ?? "AI"}: </span>
+            {item.ai_comment}
+          </p>
+        ) : desc ? (
           <p className="line-clamp-2 text-[11px] leading-relaxed text-gray-500">{desc}</p>
-        )}
+        ) : null}
         {item.source_name && (
           <p className="mt-auto text-[10px] text-gray-600">{item.source_name}</p>
         )}
