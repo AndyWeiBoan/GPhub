@@ -141,7 +141,7 @@ function HeroCard({ item }: { item: TrendingItem }) {
 // ── Medium card (image top, text below) ──────────────────────────────────────
 
 function MediumCard({ item }: { item: TrendingItem }) {
-  const desc     = excerpt(item, 300);
+  const desc     = excerpt(item, 120);
   const realImg  = hasRealImage(item);
   const gradient = CAT_GRADIENT[item.category ?? ""] ?? "from-gray-900 to-[#0f1117]";
   return (
@@ -149,9 +149,9 @@ function MediumCard({ item }: { item: TrendingItem }) {
       href={item.url}
       target="_blank"
       rel="noopener noreferrer"
-      className="group flex flex-col overflow-hidden rounded-xl border border-white/[0.05] bg-[#161b27] transition hover:border-white/10"
+      className="group flex h-[220px] flex-col overflow-hidden rounded-xl border border-white/[0.05] bg-[#161b27] transition hover:border-white/10"
     >
-      <span className="relative block">
+      <span className="relative block flex-shrink-0">
         {realImg ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -168,7 +168,7 @@ function MediumCard({ item }: { item: TrendingItem }) {
         )}
         <PhotoCredit attribution={item.thumbnail_attribution} />
       </span>
-      <span className="flex flex-1 flex-col gap-1.5 p-3">
+      <span className="flex flex-1 flex-col gap-1.5 overflow-hidden p-3">
         <span className="flex items-center gap-1.5">
           <CategoryPill category={item.category} />
           <span className="text-[10px] text-gray-600">{timeAgo(item.published_at ?? item.fetched_at)}</span>
@@ -177,12 +177,12 @@ function MediumCard({ item }: { item: TrendingItem }) {
           {item.title}
         </h3>
         {item.ai_comment ? (
-          <p className="text-[11px] leading-relaxed text-amber-400/70 italic">
+          <p className="line-clamp-3 text-[11px] leading-relaxed text-amber-400/70 italic">
             <span className="not-italic font-semibold text-amber-500/60 text-[10px]">{item.ai_comment_model ?? "AI"}: </span>
             {item.ai_comment}
           </p>
         ) : desc ? (
-          <p className="text-[11px] leading-relaxed text-gray-500">{desc}</p>
+          <p className="line-clamp-2 text-[11px] leading-relaxed text-gray-500">{desc}</p>
         ) : null}
         {item.source_name && (
           <p className="mt-auto text-[10px] text-gray-600">{item.source_name}</p>
@@ -355,7 +355,7 @@ function TopicSmallCard({ topic, rank }: { topic: Topic; rank: number }) {
       href={lead.url}
       target="_blank"
       rel="noopener noreferrer"
-      className="group relative flex h-full min-h-[140px] overflow-hidden rounded-xl border border-white/[0.06] bg-[#161b27] transition hover:border-white/15"
+      className="group relative flex h-full min-h-[180px] overflow-hidden rounded-xl border border-white/[0.06] bg-[#161b27] transition hover:border-white/15"
     >
       {realImg ? (
         <TopicCardImage src={lead.thumbnail_url!} gradient={gradient} />

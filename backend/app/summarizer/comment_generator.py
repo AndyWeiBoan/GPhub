@@ -44,14 +44,20 @@ FAST_CATEGORIES = [
 
 GEMINI_CATEGORIES = [ContentCategory.github_project]
 
-# Blog paywall detection
+# Blog paywall / thin-content detection
+# Domain list: sites that only expose a teaser in RSS (full text behind paywall)
+# Content threshold: items with < 60 chars have no usable content for commenting
+#   (e.g. dev.to/paperium echoes the title at ~23 chars, HuggingFace some blogs = 0)
+#   Medium is blocked by domain — its RSS teasers (~80-180 chars) look real but are cut off.
 PAYWALL_DOMAINS = {
-    "medium.com", "wired.com", "nytimes.com", "wsj.com", "ft.com",
+    "wired.com", "nytimes.com", "wsj.com", "ft.com",
     "technologyreview.com", "theatlantic.com", "bloomberg.com",
     "washingtonpost.com", "economist.com", "hbr.org", "forbes.com",
     "businessinsider.com", "theinformation.com",
+    # medium.com removed — RSS teasers are short but real enough for title-based commenting
+    # content-length threshold (60 chars) handles truly empty Medium items
 }
-PAYWALL_MIN_CONTENT_LEN = 200
+PAYWALL_MIN_CONTENT_LEN = 60
 
 _FAST_SLEEP   = 0.0
 _GEMINI_SLEEP = 1.0

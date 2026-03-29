@@ -163,6 +163,12 @@ RSS_SOURCES = [
         "category": ContentCategory.blog_post,
         "favicon": "https://huggingface.co/favicon.ico",
     },
+    {
+        "name": "Mozilla AI Blog",
+        "url": "https://blog.mozilla.ai/rss/",
+        "category": ContentCategory.blog_post,
+        "favicon": "https://blog.mozilla.ai/favicon.ico",
+    },
     # ── Community (Reddit) ────────────────────────────────────────────────────
     {
         "name": "Reddit – r/MachineLearning",

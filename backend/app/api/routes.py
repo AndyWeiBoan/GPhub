@@ -419,7 +419,8 @@ async def get_trending(
     ]
 
     # Category trends — derived from the already-loaded pool (no extra DB queries)
-    cutoff_24h = datetime.now(timezone.utc) - timedelta(hours=24)
+    # Use a naive cutoff for comparison: SQLite returns naive datetimes from the DB
+    cutoff_24h = datetime.utcnow() - timedelta(hours=24)
     map_7d: dict = {}
     map_24h: dict = {}
     for item in pool:
@@ -427,8 +428,11 @@ async def get_trending(
         cat = item.category
         if cat:
             map_7d[cat] = map_7d.get(cat, 0) + 1
-            if ref and ref >= cutoff_24h:
-                map_24h[cat] = map_24h.get(cat, 0) + 1
+            if ref:
+                # Strip tzinfo for comparison if present (handles both SQLite naive + Postgres aware)
+                ref_naive = ref.replace(tzinfo=None) if ref.tzinfo else ref
+                if ref_naive >= cutoff_24h:
+                    map_24h[cat] = map_24h.get(cat, 0) + 1
 
     total_7d_count = len(pool) or 1
 

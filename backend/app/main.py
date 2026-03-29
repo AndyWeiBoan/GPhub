@@ -117,6 +117,7 @@ DEFAULT_SOURCES = [
     ),
     ("Anthropic Blog", "https://www.anthropic.com/news", "tier1", "blog_post"),
     ("HuggingFace Blog", "https://huggingface.co/blog/feed.xml", "tier1", "blog_post"),
+    ("Mozilla AI Blog", "https://blog.mozilla.ai/rss/", "tier1", "blog_post"),
     # Community — Reddit AI subreddits
     (
         "Reddit – r/MachineLearning",
